@@ -274,6 +274,141 @@ export const RECENT_TRANSACTIONS: AgentTransaction[] = [
     status: "ESCROWED",
     traceCid: "bafybeiejp55...",
   },
+  {
+    id: "0x9b0c47...6d3e",
+    timestamp: "2026-05-21T08:45:12Z",
+    traderId: "0x_atlas_trader.eth",
+    specialistId: "0x5f6g7h...3c4d (polymarket_structurer)",
+    serviceType: "polymarket_structuring",
+    costUsdc: 0.00005,
+    status: "RATED",
+    rating: 5,
+    traceCid: "bafybeiqx9p2...",
+  },
+  {
+    id: "0x2d4f88...0a1b",
+    timestamp: "2026-05-21T08:45:33Z",
+    traderId: "0x_perp_pilot_alpha.eth",
+    specialistId: "0x9i0j1k...3m4n (onchain_dex_data)",
+    serviceType: "dex_telemetry",
+    costUsdc: 0.00025,
+    status: "ATTESTED",
+    traceCid: "bafybeil55kr...",
+  },
+  {
+    id: "0x06d2af...4e9c",
+    timestamp: "2026-05-21T08:45:48Z",
+    traderId: "0x_copy_trader_07.eth",
+    specialistId: "0x3w4x5y...1a2b (news_summarizer)",
+    serviceType: "news_summarization",
+    costUsdc: 0.0001,
+    status: "RATED",
+    rating: 4,
+    traceCid: "bafybeib8r3z...",
+  },
+  {
+    id: "0xa11e3c...7f24",
+    timestamp: "2026-05-21T08:46:02Z",
+    traderId: "0x_external_theo_bot.eth",
+    specialistId: "0x5e6f7g...8h9i (kelly_sizer)",
+    serviceType: "capital_allocation",
+    costUsdc: 0.00007,
+    status: "RATED",
+    rating: 5,
+    traceCid: "bafybeic02kv...",
+  },
+  {
+    id: "0xf72d09...3b6a",
+    timestamp: "2026-05-21T08:46:19Z",
+    traderId: "0x_atlas_trader.eth",
+    specialistId: "0x3f4a5b...8s9t (twitter_sentiment)",
+    serviceType: "market_sentiment",
+    costUsdc: 0.00008,
+    status: "ATTESTED",
+    traceCid: "bafybeigl8jw...",
+  },
+  {
+    id: "0xc8e3b1...5d28",
+    timestamp: "2026-05-21T08:46:41Z",
+    traderId: "0x_perp_pilot_alpha.eth",
+    specialistId: "0x7r8s9t...1u2v (risk_checker)",
+    serviceType: "risk_evaluation",
+    costUsdc: 0.00012,
+    status: "RATED",
+    rating: 5,
+    traceCid: "bafybeih39pe...",
+  },
+  {
+    id: "0x4e8f22...c19a",
+    timestamp: "2026-05-21T08:47:03Z",
+    traderId: "0x_yieldscout.eth",
+    specialistId: "0x1l2m3n...6p7q (whale_tracker_eth)",
+    serviceType: "whale_tracking",
+    costUsdc: 0.0003,
+    status: "ESCROWED",
+    traceCid: "bafybeic7y2g...",
+  },
+  {
+    id: "0x0b67df...2f15",
+    timestamp: "2026-05-21T08:47:21Z",
+    traderId: "0x_atlas_trader.eth",
+    specialistId: "0x8a4b3c...6q7r (mandarin_macro)",
+    serviceType: "translation",
+    costUsdc: 0.00015,
+    status: "ATTESTED",
+    traceCid: "bafybeio9bcr...",
+  },
+];
+
+export interface MarketplaceSummary {
+  cumulativeVolumeUsdc: number;
+  activeSpecialists: number;
+  queriesLastHour: number;
+  tracesAnchored: number;
+  totalQueriesAllTime: number;
+  externalAgentsIntegrated: number;
+}
+
+export const MARKETPLACE_SUMMARY: MarketplaceSummary = {
+  cumulativeVolumeUsdc: 18.7894,
+  activeSpecialists: 8,
+  queriesLastHour: 141,
+  tracesAnchored: 421,
+  totalQueriesAllTime: 161399,
+  externalAgentsIntegrated: 4,
+};
+
+export interface VolumeBucket {
+  hour: string;
+  queries: number;
+  usdc: number;
+}
+
+export const VOLUME_24H: VolumeBucket[] = [
+  { hour: "09:00", queries: 22, usdc: 0.0031 },
+  { hour: "10:00", queries: 41, usdc: 0.0058 },
+  { hour: "11:00", queries: 38, usdc: 0.0054 },
+  { hour: "12:00", queries: 57, usdc: 0.0079 },
+  { hour: "13:00", queries: 72, usdc: 0.0102 },
+  { hour: "14:00", queries: 88, usdc: 0.0124 },
+  { hour: "15:00", queries: 95, usdc: 0.0141 },
+  { hour: "16:00", queries: 112, usdc: 0.0166 },
+  { hour: "17:00", queries: 124, usdc: 0.0181 },
+  { hour: "18:00", queries: 109, usdc: 0.0159 },
+  { hour: "19:00", queries: 94, usdc: 0.0133 },
+  { hour: "20:00", queries: 86, usdc: 0.0121 },
+  { hour: "21:00", queries: 75, usdc: 0.0106 },
+  { hour: "22:00", queries: 68, usdc: 0.0094 },
+  { hour: "23:00", queries: 61, usdc: 0.0085 },
+  { hour: "00:00", queries: 49, usdc: 0.0069 },
+  { hour: "01:00", queries: 42, usdc: 0.0058 },
+  { hour: "02:00", queries: 38, usdc: 0.0053 },
+  { hour: "03:00", queries: 35, usdc: 0.0049 },
+  { hour: "04:00", queries: 33, usdc: 0.0046 },
+  { hour: "05:00", queries: 47, usdc: 0.0066 },
+  { hour: "06:00", queries: 79, usdc: 0.0111 },
+  { hour: "07:00", queries: 118, usdc: 0.0167 },
+  { hour: "08:00", queries: 141, usdc: 0.0202 },
 ];
 
 export const ATLAS_FLAGSHIP_TRACE: CompositionTrace = {
