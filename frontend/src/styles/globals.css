@@ -1,0 +1,111 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-canvas: #000000;
+  --color-card: #050505;
+  --color-foreground: #f5f5f5;
+  --color-muted: #737373;
+  --color-border: #1f1f1f;
+  --color-border-faint: rgba(255, 255, 255, 0.05);
+  --color-accent: #f59e0b;
+
+  --font-sans: var(--font-satoshi), ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, "JetBrains Mono",
+    "SFMono-Regular", Menlo, Monaco, monospace;
+}
+
+@keyframes logos-grid-drift {
+  0% {
+    background-position: 0 0, 0 0;
+  }
+  100% {
+    background-position: 80px 80px, 80px 80px;
+  }
+}
+
+@keyframes logos-shaft-flicker {
+  0%,
+  100% {
+    opacity: var(--shaft-base, 1);
+    transform: translateX(-50%) scaleY(1);
+  }
+  35% {
+    opacity: calc(var(--shaft-base, 1) * 0.7);
+    transform: translateX(-50%) scaleY(0.96);
+  }
+  65% {
+    opacity: calc(var(--shaft-base, 1) * 1.15);
+    transform: translateX(-50%) scaleY(1.03);
+  }
+}
+
+@keyframes logos-bloom-pulse {
+  0%,
+  100% {
+    opacity: 0.88;
+    transform: translate3d(-50%, -50%, 0) scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: translate3d(-50%, -50%, 0) scale(1.04);
+  }
+}
+
+@keyframes logos-marquee {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+@keyframes logos-scanline {
+  0% {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.45;
+  }
+  90% {
+    opacity: 0.45;
+  }
+  100% {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+}
+
+html,
+body {
+  background-color: var(--color-canvas);
+  color: var(--color-foreground);
+  font-family: var(--font-sans);
+}
+
+.logos-reveal {
+  opacity: 0;
+  filter: blur(10px);
+  transform: translateY(28px) scale(0.985);
+  transition: opacity 0.85s cubic-bezier(0.19, 1, 0.22, 1),
+    filter 0.85s cubic-bezier(0.19, 1, 0.22, 1),
+    transform 0.85s cubic-bezier(0.19, 1, 0.22, 1);
+  will-change: opacity, filter, transform;
+}
+.logos-reveal[data-visible="true"] {
+  opacity: 1;
+  filter: blur(0);
+  transform: translateY(0) scale(1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .logos-reveal,
+  .logos-reveal[data-visible="true"] {
+    opacity: 1;
+    filter: none;
+    transform: none;
+    transition: none;
+  }
+}
