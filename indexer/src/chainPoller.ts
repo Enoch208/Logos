@@ -1,13 +1,11 @@
 import {
   createPublicClient,
   http,
-  type Log,
+  type AbiEvent,
   type PublicClient,
   formatUnits,
-  hexToString,
   keccak256,
   stringToBytes,
-  trim,
 } from "viem";
 import { config } from "./config.js";
 import { recordTransaction } from "./store.js";
@@ -19,12 +17,24 @@ import type { AgentTransaction, QueryStatus } from "./types.js";
  * AgentTransaction rows for the dashboard. Activates only when
  * ARC_RPC_URL + ARC_CHAIN_ID + MARKETPLACE_ADDRESS are all set; otherwise the
  * service falls back to the mock emitter.
+ *
+ * Implementation: block-cursor `eth_getLogs` polling.
+ *
+ * Why not `watchContractEvent`: viem's default watcher uses RPC-side filters
+ * (`eth_newFilter` + `eth_getFilterChanges`). On Arc testnet — and most
+ * managed RPCs — filters are garbage-collected after a short idle window
+ * (typically 5 min), at which point the watcher silently stops firing
+ * without erroring. We poll `eth_getLogs` with our own block cursor + an
+ * in-memory dedup set, so the indexer recovers automatically across RPC
+ * filter expiry, RPC node failovers, and even indexer restarts (the
+ * backfill window picks up events that fired while we were down).
  */
 
 export const MARKETPLACE_ABI = [
   {
     type: "event",
     name: "OfferPublished",
+    anonymous: false,
     inputs: [
       { name: "offerId", type: "bytes32", indexed: true },
       { name: "agentId", type: "bytes32", indexed: true },
@@ -36,6 +46,7 @@ export const MARKETPLACE_ABI = [
   {
     type: "event",
     name: "QueryRecorded",
+    anonymous: false,
     inputs: [
       { name: "queryId", type: "bytes32", indexed: true },
       { name: "offerId", type: "bytes32", indexed: true },
@@ -46,6 +57,7 @@ export const MARKETPLACE_ABI = [
   {
     type: "event",
     name: "ResponseAttested",
+    anonymous: false,
     inputs: [
       { name: "queryId", type: "bytes32", indexed: true },
       { name: "responseHash", type: "bytes32" },
@@ -55,6 +67,7 @@ export const MARKETPLACE_ABI = [
   {
     type: "event",
     name: "ResponseRated",
+    anonymous: false,
     inputs: [
       { name: "queryId", type: "bytes32", indexed: true },
       { name: "rating", type: "uint8" },
@@ -63,6 +76,7 @@ export const MARKETPLACE_ABI = [
   {
     type: "event",
     name: "QueryExpired",
+    anonymous: false,
     inputs: [{ name: "queryId", type: "bytes32", indexed: true }],
   },
   {
@@ -98,34 +112,43 @@ export const MARKETPLACE_ABI = [
   },
 ] as const;
 
+const WATCHED_EVENT_NAMES = [
+  "QueryRecorded",
+  "ResponseAttested",
+  "ResponseRated",
+] as const;
+
+const WATCHED_EVENTS = MARKETPLACE_ABI.filter(
+  (item) =>
+    item.type === "event" &&
+    (WATCHED_EVENT_NAMES as readonly string[]).includes(item.name),
+) as unknown as AbiEvent[];
+
+const EVENT_TO_STATUS: Record<string, QueryStatus> = {
+  QueryRecorded: "ESCROWED",
+  ResponseAttested: "ATTESTED",
+  ResponseRated: "RATED",
+};
+
+const POLL_INTERVAL_MS = 4_000;
+const BACKFILL_BLOCKS = 200n; // ~13 min at 4s/block — covers a restart window
+const MAX_CHUNK_BLOCKS = 1_000n; // most RPCs cap getLogs at ~1k blocks
+const DEDUP_CAP = 10_000;
+
 const SERVICE_BY_HASH = buildServiceLookup();
 
 function buildServiceLookup(): Map<string, { name: string; service: string }> {
   const map = new Map<string, { name: string; service: string }>();
-  // The Python specialist derives its agentId as
-  //   keccak256(utf8 bytes("logos-agent:" + name))
-  // — `logos.canonical.keccak_text` on the agents side. Mirror that here so
-  // the dashboard can translate on-chain agentIds back to human names.
   for (const s of SEED_SPECIALISTS) {
     const derived = keccak256(stringToBytes(`logos-agent:${s.name}`));
     map.set(derived.toLowerCase(), { name: s.name, service: s.serviceType });
-    // Also seed the mock-data id so chainPoller and mock mode share names.
     map.set(s.id.toLowerCase(), { name: s.name, service: s.serviceType });
   }
   return map;
 }
 
 function bytes32ToCid(raw: string): string {
-  // The marketplace stores the IPFS CID as bytes32 (multihash digest, no
-  // codec prefix). Indexer presents it as-is — a follow-up can reconstruct
-  // the multibase CIDv1 string given the codec/version.
   return raw;
-}
-
-function ratingFromLog(log: Log & { args?: { rating?: number | bigint } }): number | undefined {
-  const r = log.args?.rating;
-  if (r === undefined) return undefined;
-  return typeof r === "bigint" ? Number(r) : r;
 }
 
 type Handle = { stop: () => void };
@@ -141,8 +164,13 @@ export function startChainPoller(
   });
   const marketplace = config.arc.marketplace as `0x${string}`;
 
+  let cursor = 0n; // last block we've processed, inclusive
+  const seen = new Set<string>(); // `${txHash}:${logIndex}` dedup
+  let running = true;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+
   async function readQueryAndOffer(queryId: `0x${string}`) {
-    const [trader, offerId, paymentAuthHash, , responseHash, traceCID, rating, createdAt, status] =
+    const [trader, offerId, , , , traceCID, , , status] =
       (await client.readContract({
         address: marketplace,
         abi: MARKETPLACE_ABI,
@@ -159,7 +187,7 @@ export function startChainPoller(
         bigint,
         number,
       ];
-    const [agentId, serviceTypeHash, , pricePerQuery] = (await client.readContract({
+    const [agentId, , , pricePerQuery] = (await client.readContract({
       address: marketplace,
       abi: MARKETPLACE_ABI,
       functionName: "offers",
@@ -172,19 +200,7 @@ export function startChainPoller(
       string,
       boolean,
     ];
-    return {
-      trader,
-      offerId,
-      paymentAuthHash,
-      responseHash,
-      traceCID,
-      rating,
-      createdAt,
-      status,
-      agentId,
-      serviceTypeHash,
-      pricePerQuery,
-    };
+    return { trader, offerId, traceCID, status, agentId, pricePerQuery };
   }
 
   function describeSpecialist(agentId: string) {
@@ -215,14 +231,13 @@ export function startChainPoller(
         specialistId,
         serviceType,
         costUsdc: Number(formatUnits(q.pricePerQuery, 6)),
-        // Status reflects the EVENT that fired, not the chain's current
-        // state — by the time we enrich, the query may have advanced past
-        // the event we're processing.
         status,
         ...(rating !== undefined ? { rating } : {}),
         traceCid: bytes32ToCid(q.traceCID),
       };
-      console.log(`[chainPoller] ${status} ${queryId.slice(0, 14)}… ${specialistId}`);
+      console.log(
+        `[chainPoller] ${status} ${queryId.slice(0, 14)}… ${specialistId}`,
+      );
       await recordTransaction(tx);
       onTx(tx);
     } catch (err) {
@@ -230,50 +245,89 @@ export function startChainPoller(
     }
   }
 
-  const unwatches = [
-    client.watchContractEvent({
-      address: marketplace,
-      abi: MARKETPLACE_ABI,
-      eventName: "QueryRecorded",
-      onLogs: (logs) => {
-        for (const log of logs) {
-          const id = (log as { args?: { queryId?: `0x${string}` } }).args?.queryId;
-          if (id) void emitForQuery(id, "ESCROWED");
-        }
-      },
-    }),
-    client.watchContractEvent({
-      address: marketplace,
-      abi: MARKETPLACE_ABI,
-      eventName: "ResponseAttested",
-      onLogs: (logs) => {
-        for (const log of logs) {
-          const id = (log as { args?: { queryId?: `0x${string}` } }).args?.queryId;
-          if (id) void emitForQuery(id, "ATTESTED");
-        }
-      },
-    }),
-    client.watchContractEvent({
-      address: marketplace,
-      abi: MARKETPLACE_ABI,
-      eventName: "ResponseRated",
-      onLogs: (logs) => {
-        for (const log of logs) {
-          const id = (log as { args?: { queryId?: `0x${string}` } }).args?.queryId;
-          if (id) void emitForQuery(id, "RATED", ratingFromLog(log));
-        }
-      },
-    }),
-  ];
+  function rememberLog(log: { transactionHash: string | null; logIndex: number | null }): boolean {
+    if (!log.transactionHash || log.logIndex === null) return true;
+    const key = `${log.transactionHash}:${log.logIndex}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    if (seen.size > DEDUP_CAP) {
+      // Trim oldest half — cheap and correct enough; cursor still advances.
+      const half = Math.floor(DEDUP_CAP / 2);
+      let i = 0;
+      for (const k of seen) {
+        if (i++ >= half) break;
+        seen.delete(k);
+      }
+    }
+    return true;
+  }
 
-  console.log(`[chainPoller] watching ${marketplace} on chainId=${config.arc.chainId}`);
+  async function tick(): Promise<void> {
+    if (!running) return;
+    try {
+      const latest = await client.getBlockNumber();
+      if (cursor === 0n) {
+        cursor = latest > BACKFILL_BLOCKS ? latest - BACKFILL_BLOCKS : 0n;
+        console.log(
+          `[chainPoller] starting cursor at block ${cursor} (latest=${latest}, backfill=${BACKFILL_BLOCKS})`,
+        );
+      }
+      if (latest <= cursor) return;
+
+      const fromBlock = cursor + 1n;
+      const toBlock =
+        latest > fromBlock + MAX_CHUNK_BLOCKS
+          ? fromBlock + MAX_CHUNK_BLOCKS
+          : latest;
+
+      const logs = await client.getLogs({
+        address: marketplace,
+        events: WATCHED_EVENTS,
+        fromBlock,
+        toBlock,
+      });
+
+      for (const log of logs) {
+        if (!rememberLog(log)) continue;
+        const name = (log as { eventName?: string }).eventName;
+        const status = name ? EVENT_TO_STATUS[name] : undefined;
+        const args = (log as { args?: Record<string, unknown> }).args ?? {};
+        const queryId = args.queryId as `0x${string}` | undefined;
+        if (!queryId || !status) continue;
+
+        const ratingArg = args.rating;
+        const rating =
+          typeof ratingArg === "bigint"
+            ? Number(ratingArg)
+            : typeof ratingArg === "number"
+              ? ratingArg
+              : undefined;
+
+        await emitForQuery(queryId, status, rating);
+      }
+
+      cursor = toBlock;
+    } catch (err) {
+      console.warn("[chainPoller] poll iteration failed:", err);
+      // Don't advance the cursor on failure — we'll retry the same window
+      // next tick. If the RPC is permanently borked we'll keep logging
+      // until the operator notices.
+    } finally {
+      if (running) {
+        timer = setTimeout(tick, POLL_INTERVAL_MS);
+      }
+    }
+  }
+
+  console.log(
+    `[chainPoller] watching ${marketplace} on chainId=${config.arc.chainId} (poll=${POLL_INTERVAL_MS}ms, backfill=${BACKFILL_BLOCKS} blocks)`,
+  );
+  void tick();
 
   return {
     stop: () => {
-      for (const u of unwatches) u();
+      running = false;
+      if (timer) clearTimeout(timer);
     },
   };
 }
-
-// Re-export utilities for future use / introspection.
-export { hexToString, trim };
