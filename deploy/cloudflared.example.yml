@@ -1,0 +1,33 @@
+# Example cloudflared tunnel config — drop into ~/.cloudflared/config.yml
+# on the VPS, replace <tunnel-id> and your domain, then run
+#   cloudflared tunnel route dns <tunnel-name> api.logos.yourdomain.com
+#   cloudflared tunnel route dns <tunnel-name> agents.logos.yourdomain.com
+# to provision the DNS records.
+#
+# Hostnames (frontend lives on Vercel, only the backend needs the tunnel):
+#   api.logos.yourdomain.com     → indexer   (REST + /ws/feed)
+#   agents.logos.yourdomain.com  → fleet     (8 specialists under /specialists/<name>)
+#
+# Cloudflared provisions Cloudflare-managed TLS at the edge, so the Vercel
+# frontend's NEXT_PUBLIC_WS_URL must use `wss://` (not `ws://`).
+
+tunnel: <tunnel-id>
+credentials-file: /root/.cloudflared/<tunnel-id>.json
+
+originRequest:
+  noTLSVerify: true
+  connectTimeout: 30s
+
+ingress:
+  - hostname: api.logos.yourdomain.com
+    service: http://localhost:4000
+    originRequest:
+      # /ws/feed needs no special config — cloudflared upgrades WebSocket
+      # connections automatically.
+      noTLSVerify: true
+
+  - hostname: agents.logos.yourdomain.com
+    service: http://localhost:8080
+
+  # Catch-all — anything else returns 404 instead of being proxied.
+  - service: http_status:404
