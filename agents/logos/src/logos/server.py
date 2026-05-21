@@ -37,7 +37,7 @@ from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
 
 from .canonical import canonical_dumps, keccak_hex, keccak_text
-from .contracts import ChainBridge, ChainConfig
+from .contracts import ChainBridge, ChainConfig, _hex0x
 from .ipfs import pin_trace
 from .schemas import validate_response
 from .signing import sign_attestation
@@ -242,7 +242,7 @@ async def _ensure_offer(bridge: ChainBridge, specialist: Specialist, endpoint: s
         # The on-chain offer is still live; the trader can find it by
         # querying offers(agentId) once that view is exposed.
         return keccak_text(f"offer:{specialist.name}:{tx_hash}")
-    return "0x" + events[0]["args"]["offerId"].hex()
+    return _hex0x(events[0]["args"]["offerId"])
 
 
 def run(specialist: Specialist, *, host: str = "0.0.0.0", port: int = 0) -> None:

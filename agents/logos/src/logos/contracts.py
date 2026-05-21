@@ -74,6 +74,7 @@ MARKETPLACE_ABI: list[dict[str, Any]] = [
     {
         "type": "event",
         "name": "QueryRecorded",
+        "anonymous": False,
         "inputs": [
             {"name": "queryId", "type": "bytes32", "indexed": True},
             {"name": "offerId", "type": "bytes32", "indexed": True},
@@ -84,6 +85,7 @@ MARKETPLACE_ABI: list[dict[str, Any]] = [
     {
         "type": "event",
         "name": "OfferPublished",
+        "anonymous": False,
         "inputs": [
             {"name": "offerId", "type": "bytes32", "indexed": True},
             {"name": "agentId", "type": "bytes32", "indexed": True},
@@ -146,6 +148,14 @@ def _to_bytes32(value: str | bytes) -> bytes:
         return value
     raw = value[2:] if value.startswith("0x") else value
     return bytes.fromhex(raw.rjust(64, "0"))
+
+
+def _hex0x(value: str | bytes) -> str:
+    """web3.py 7.x's HexBytes.hex() drops the 0x prefix in some versions
+    and keeps it in others. Normalise so callers always get 0x-prefixed."""
+    if isinstance(value, bytes):
+        return "0x" + value.hex()
+    return value if value.startswith("0x") else "0x" + value
 
 
 class ChainBridge:
@@ -212,7 +222,7 @@ class ChainBridge:
         if not events:
             raise RuntimeError("QueryRecorded event not found in receipt")
         query_id_bytes = events[0]["args"]["queryId"]
-        return receipt["transactionHash"].hex(), "0x" + query_id_bytes.hex()
+        return _hex0x(receipt["transactionHash"]), _hex0x(query_id_bytes)
 
     def attest_response(
         self, query_id: str, response_hash: str, trace_cid: str, signature: str
@@ -238,7 +248,7 @@ class ChainBridge:
 
     def _send(self, fn) -> str:
         receipt = self._send_receipt(fn)
-        return receipt["transactionHash"].hex()
+        return _hex0x(receipt["transactionHash"])
 
     def _send_receipt(self, fn) -> Any:
         tx = fn.build_transaction(

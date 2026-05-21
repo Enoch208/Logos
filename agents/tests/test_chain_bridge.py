@@ -46,7 +46,7 @@ def bridge(cfg: ChainConfig, monkeypatch: pytest.MonkeyPatch) -> ChainBridge:
 
     fake_receipt: dict[str, Any] = {
         "status": 1,
-        "transactionHash": SimpleNamespace(hex=lambda: "0x" + "11" * 32),
+        "transactionHash": bytes.fromhex("11" * 32),
         "logs": [],
     }
 
@@ -54,7 +54,7 @@ def bridge(cfg: ChainConfig, monkeypatch: pytest.MonkeyPatch) -> ChainBridge:
         if getattr(fake_send_receipt, "force_revert", False):  # type: ignore[attr-defined]
             return {
                 "status": 0,
-                "transactionHash": SimpleNamespace(hex=lambda: "0xdead"),
+                "transactionHash": bytes.fromhex("de" * 32),
                 "logs": [],
             }
         return fake_receipt
