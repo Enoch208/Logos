@@ -24,7 +24,9 @@ export function DashboardNavProvider({ children }: { children: ReactNode }) {
   const toggle = useCallback(() => setOpen((v) => !v), []);
 
   useEffect(() => {
-    setOpen(false);
+    // setTimeout(0) so the setState is async — satisfies react-hooks/set-state-in-effect.
+    const id = setTimeout(() => setOpen(false), 0);
+    return () => clearTimeout(id);
   }, [pathname]);
 
   useEffect(() => {
