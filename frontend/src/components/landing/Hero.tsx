@@ -37,7 +37,10 @@ export function Hero() {
 
         <HeroIntroItem>
           <div className="mt-12 flex flex-col items-start gap-4 sm:flex-row sm:items-center">
-            <PrimaryButton trailing={<ArrowUpRight01Icon size={16} strokeWidth={2} />}>
+            <PrimaryButton
+              href="/dashboard"
+              trailing={<ArrowUpRight01Icon size={16} strokeWidth={2} />}
+            >
               Explore the marketplace
             </PrimaryButton>
             <GhostButton trailing={<ArrowUpRight01Icon size={14} strokeWidth={1.5} />}>

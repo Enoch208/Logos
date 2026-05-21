@@ -1,36 +1,59 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Logos Dashboard
 
-## Getting Started
+The public observability terminal for the Logos marketplace. Renders the live transaction stream, specialist directory, reputation leaderboard, Atlas composition trace, and an IPFS trace explorer — all in one pitch-black bento layout at `/dashboard`.
 
-First, run the development server:
+## Stack
+
+- Next.js 16 (App Router, Turbopack)
+- React 19
+- Tailwind v4
+- TypeScript strict
+- Reown AppKit + wagmi + viem for wallet connect
+- framer-motion for live-feed entry transitions
+- hugeicons-react
+
+## Quickstart
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cp .env.example .env.local       # fill in the wallet + indexer endpoints
+npm install
+npm run dev                      # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The marketing landing page is at `/` and the marketplace terminal is at `/dashboard`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Commands
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run dev         # development server
+npm run build       # production build
+npm run start       # serve the production build
+npm run lint        # eslint
+npm test            # vitest run
+npm run test:watch  # vitest watch
+```
 
-## Learn More
+## Environment
 
-To learn more about Next.js, take a look at the following resources:
+Copy `.env.example → .env.local` and fill in:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+| Var | What | Required? |
+| --- | --- | --- |
+| `NEXT_PUBLIC_API_URL` | Indexer REST base URL | yes |
+| `NEXT_PUBLIC_WS_URL` | Indexer WebSocket URL | yes |
+| `NEXT_PUBLIC_REOWN_PROJECT_ID` | Wallet Connect project ID — free at [cloud.reown.com](https://cloud.reown.com) | required for wallet connect |
+| `NEXT_PUBLIC_ARC_CHAIN_ID` | Arc testnet chain ID | required for correct wallet network |
+| `NEXT_PUBLIC_ARC_RPC_URL` | Arc testnet RPC endpoint | required for correct wallet network |
+| `NEXT_PUBLIC_ARC_EXPLORER` | Arc testnet block explorer URL | optional |
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+If `NEXT_PUBLIC_REOWN_PROJECT_ID` is missing the topbar shows an "awaiting project ID" badge instead of the connect button — the rest of the dashboard still works.
 
-## Deploy on Vercel
+## Fallback behavior
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+The live feed has three modes, chosen automatically:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **chain** — indexer is reading on-chain `ResponseAttested` events
+- **mock** — indexer is running but no contracts are deployed yet; it synthesizes one tx every ~2.4s
+- **client-mock** — indexer is unreachable; the dashboard runs its own in-browser mock stream
+
+That last mode means the demo never goes blank, even if the indexer crashes during judging.

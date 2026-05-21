@@ -53,7 +53,7 @@ export function Header() {
             Sign in
           </Link>
           <Link
-            href="#dashboard"
+            href="/dashboard"
             className="cursor-pointer rounded-full bg-foreground px-4 py-2 text-sm font-medium text-black transition-all duration-200 ease-out hover:bg-foreground/90 active:scale-[0.98]"
           >
             Open dashboard
