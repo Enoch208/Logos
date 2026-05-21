@@ -63,6 +63,14 @@ ALL_SPECIALISTS = [
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    from logos.llm import is_configured as _llm_configured
+
+    if _llm_configured():
+        model = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
+        print(f"[fleet] LLM: enabled (model={model})", flush=True)
+    else:
+        print("[fleet] LLM: disabled (OPENAI_API_KEY not set) — using stubs", flush=True)
+
     cfg = ChainConfig.from_env()
     if cfg:
         try:

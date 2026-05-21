@@ -287,33 +287,64 @@ async def _ensure_offer(bridge: ChainBridge, specialist: Specialist, endpoint: s
     return _hex0x(events[0]["args"]["offerId"])
 
 
+_OFFER_LOOKBACK_BLOCKS = int(os.environ.get("LOGOS_OFFER_LOOKBACK", "20000"))
+"""Total blocks to scan backwards looking for a prior OfferPublished.
+~22 hours at 4s blocks — well past any normal restart window."""
+
+_OFFER_CHUNK_BLOCKS = int(os.environ.get("LOGOS_OFFER_CHUNK", "500"))
+"""Max blocks per eth_getLogs call. Arc testnet's RPC rejects ranges
+larger than this with `413 Request Entity Too Large` — most managed
+RPCs cap somewhere between 100 and 5000. 500 is a safe default; bump
+via env if a fatter RPC accepts more."""
+
+
 def _find_active_offer(bridge: ChainBridge, agent_id: str) -> str | None:
-    """Scans the recent past for OfferPublished(agentId=...) events and
-    returns the most recent offer that is still flagged active on-chain.
-    Looks back ~14 days at 4s/block; tweak if blocks-per-day changes."""
+    """Scans the recent past for OfferPublished(agentId=...) events in
+    small chunks (Arc's RPC rejects wide ranges) and returns the most
+    recent offer still flagged active on-chain. Walks backwards from
+    `latest` so a freshly-published offer is found in the first chunk
+    on the normal restart path."""
     try:
         latest = bridge.w3.eth.block_number
-        lookback_blocks = 14 * 24 * 60 * 60 // 4  # ~14 days at 4s/block
-        from_block = max(0, latest - lookback_blocks)
-        logs = bridge.marketplace.events.OfferPublished().get_logs(
-            from_block=from_block,
-            argument_filters={"agentId": _to_bytes32(agent_id)},
-        )
     except Exception as e:
-        print(f"[server] could not scan past offers ({e}); will publish fresh", flush=True)
+        print(f"[server] could not read latest block ({e}); will publish fresh", flush=True)
         return None
 
-    # Newest first — first active one wins.
-    for log in reversed(list(logs)):
-        offer_id_bytes = log["args"]["offerId"]
+    agent_topic = _to_bytes32(agent_id)
+    to_block = latest
+    floor = max(0, latest - _OFFER_LOOKBACK_BLOCKS)
+
+    while to_block > floor:
+        from_block = max(floor, to_block - _OFFER_CHUNK_BLOCKS + 1)
         try:
-            offer = bridge.marketplace.functions.offers(offer_id_bytes).call()
-        except Exception:
-            continue
-        # offers(bytes32) returns (agentId, serviceTypeHash, schemaHash,
-        # pricePerQuery, endpointURL, active) — `active` is the 6th field.
-        if len(offer) >= 6 and bool(offer[5]):
-            return _hex0x(offer_id_bytes)
+            logs = bridge.marketplace.events.OfferPublished().get_logs(
+                from_block=from_block,
+                to_block=to_block,
+                argument_filters={"agentId": agent_topic},
+            )
+        except Exception as e:
+            print(
+                f"[server] getLogs failed for blocks {from_block}..{to_block} ({e}); "
+                f"will publish fresh",
+                flush=True,
+            )
+            return None
+
+        # Newest first — first active one wins.
+        for log in reversed(list(logs)):
+            offer_id_bytes = log["args"]["offerId"]
+            try:
+                offer = bridge.marketplace.functions.offers(offer_id_bytes).call()
+            except Exception:
+                continue
+            # offers(bytes32) returns (agentId, serviceTypeHash, schemaHash,
+            # pricePerQuery, endpointURL, active) — `active` is the 6th field.
+            if len(offer) >= 6 and bool(offer[5]):
+                return _hex0x(offer_id_bytes)
+
+        if from_block == floor:
+            break
+        to_block = from_block - 1
 
     return None
 
