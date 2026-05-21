@@ -26,6 +26,7 @@ Example
 
 from __future__ import annotations
 
+import json
 import os
 import secrets
 from collections.abc import AsyncIterator
@@ -250,22 +251,56 @@ def build_app(specialist: Specialist) -> FastAPI:
     return app
 
 
+_OFFER_CACHE_PATH = os.environ.get("LOGOS_OFFER_CACHE", ".fleet-offers.json")
+"""agentId → offerId cache, written next to the running process (cwd is
+agents/ under PM2). Lets restarts reuse a previously-published offer with
+a single eth_call instead of scanning logs — Arc's block time is fast
+enough that a log scan either overshoots its range cap or is too slow."""
+
+
+def _load_offer_cache() -> dict[str, str]:
+    try:
+        with open(_OFFER_CACHE_PATH, encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        return {}
+
+
+def _save_offer_cache(cache: dict[str, str]) -> None:
+    try:
+        with open(_OFFER_CACHE_PATH, "w", encoding="utf-8") as f:
+            json.dump(cache, f, indent=2, sort_keys=True)
+    except OSError as e:
+        print(f"[server] could not write offer cache ({e})", flush=True)
+
+
+def _offer_is_active(bridge: ChainBridge, offer_id: str) -> bool:
+    """Single eth_call — no log range, immune to RPC range caps + block time."""
+    try:
+        offer = bridge.marketplace.functions.offers(_to_bytes32(offer_id)).call()
+    except Exception:
+        return False
+    # offers(bytes32) → (agentId, serviceTypeHash, schemaHash, pricePerQuery,
+    # endpointURL, active); `active` is the 6th field.
+    return len(offer) >= 6 and bool(offer[5])
+
+
 async def _ensure_offer(bridge: ChainBridge, specialist: Specialist, endpoint: str) -> str:
-    """Registers the agent (idempotent) and returns an active offer id for
-    it. Reuses the most recent active OfferPublished event if one exists,
-    otherwise publishes a fresh offer. This makes restarts cheap — without
-    it every fleet boot would publish 8 fresh offers and burn deployer gas
-    on every restart even though the previous offers are still on-chain
-    and active.
-    """
+    """Registers the agent (idempotent) and returns an active offer id.
+    Reuses a cached offer if it's still active on-chain, otherwise
+    publishes a fresh one and caches it. Without the cache every fleet
+    boot would re-publish 8 offers and burn deployer gas even though the
+    previous offers are still live."""
     try:
         bridge.register_agent(specialist.agent_id, f"ipfs://specialist/{specialist.name}")
     except Exception:
         pass  # already registered; ignore
 
-    cached = _find_active_offer(bridge, specialist.agent_id)
-    if cached is not None:
-        return cached
+    cache = _load_offer_cache()
+    cached_id = cache.get(specialist.agent_id)
+    if cached_id and _offer_is_active(bridge, cached_id):
+        return cached_id
 
     tx_hash = bridge.publish_offer(
         agent_id=specialist.agent_id,
@@ -274,79 +309,16 @@ async def _ensure_offer(bridge: ChainBridge, specialist: Specialist, endpoint: s
         price_per_query=specialist.price_per_query_usdc_6,
         endpoint_url=endpoint,
     )
-    # The tx mined; pull the OfferPublished event from the receipt to learn
-    # the offer id. We re-fetch the receipt because publish_offer currently
-    # only returns the tx hash.
     receipt = bridge.w3.eth.get_transaction_receipt(tx_hash)
     events = bridge.marketplace.events.OfferPublished().process_receipt(receipt)
-    if not events:
-        # No event in ABI — fall back to a deterministic placeholder.
-        # The on-chain offer is still live; the trader can find it by
-        # querying offers(agentId) once that view is exposed.
-        return keccak_text(f"offer:{specialist.name}:{tx_hash}")
-    return _hex0x(events[0]["args"]["offerId"])
-
-
-_OFFER_LOOKBACK_BLOCKS = int(os.environ.get("LOGOS_OFFER_LOOKBACK", "20000"))
-"""Total blocks to scan backwards looking for a prior OfferPublished.
-~22 hours at 4s blocks — well past any normal restart window."""
-
-_OFFER_CHUNK_BLOCKS = int(os.environ.get("LOGOS_OFFER_CHUNK", "500"))
-"""Max blocks per eth_getLogs call. Arc testnet's RPC rejects ranges
-larger than this with `413 Request Entity Too Large` — most managed
-RPCs cap somewhere between 100 and 5000. 500 is a safe default; bump
-via env if a fatter RPC accepts more."""
-
-
-def _find_active_offer(bridge: ChainBridge, agent_id: str) -> str | None:
-    """Scans the recent past for OfferPublished(agentId=...) events in
-    small chunks (Arc's RPC rejects wide ranges) and returns the most
-    recent offer still flagged active on-chain. Walks backwards from
-    `latest` so a freshly-published offer is found in the first chunk
-    on the normal restart path."""
-    try:
-        latest = bridge.w3.eth.block_number
-    except Exception as e:
-        print(f"[server] could not read latest block ({e}); will publish fresh", flush=True)
-        return None
-
-    agent_topic = _to_bytes32(agent_id)
-    to_block = latest
-    floor = max(0, latest - _OFFER_LOOKBACK_BLOCKS)
-
-    while to_block > floor:
-        from_block = max(floor, to_block - _OFFER_CHUNK_BLOCKS + 1)
-        try:
-            logs = bridge.marketplace.events.OfferPublished().get_logs(
-                from_block=from_block,
-                to_block=to_block,
-                argument_filters={"agentId": agent_topic},
-            )
-        except Exception as e:
-            print(
-                f"[server] getLogs failed for blocks {from_block}..{to_block} ({e}); "
-                f"will publish fresh",
-                flush=True,
-            )
-            return None
-
-        # Newest first — first active one wins.
-        for log in reversed(list(logs)):
-            offer_id_bytes = log["args"]["offerId"]
-            try:
-                offer = bridge.marketplace.functions.offers(offer_id_bytes).call()
-            except Exception:
-                continue
-            # offers(bytes32) returns (agentId, serviceTypeHash, schemaHash,
-            # pricePerQuery, endpointURL, active) — `active` is the 6th field.
-            if len(offer) >= 6 and bool(offer[5]):
-                return _hex0x(offer_id_bytes)
-
-        if from_block == floor:
-            break
-        to_block = from_block - 1
-
-    return None
+    offer_id = (
+        _hex0x(events[0]["args"]["offerId"])
+        if events
+        else keccak_text(f"offer:{specialist.name}:{tx_hash}")
+    )
+    cache[specialist.agent_id] = offer_id
+    _save_offer_cache(cache)
+    return offer_id
 
 
 def run(specialist: Specialist, *, host: str = "0.0.0.0", port: int = 0) -> None:

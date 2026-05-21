@@ -9,5 +9,6 @@ venv/
 .mypy_cache/
 .env
 .env.local
+.fleet-offers.json
 build/
 dist/
