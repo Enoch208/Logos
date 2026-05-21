@@ -48,12 +48,36 @@ curl -X POST http://localhost:7401/run \
 # → 200, with a signed AttestedResponse
 ```
 
-## Run Atlas against it
+## All 8 specialists at once
 
 ```bash
-export MANDARIN_MACRO_URL=http://localhost:7401
+# Each one runs on a dedicated port (7401–7408). Boot them in the background.
+for spec in mandarin_macro twitter_sentiment polymarket_structurer whale_tracker_eth \
+            risk_checker news_summarizer kelly_sizer onchain_dex_data; do
+  python specialists/$spec/main.py &
+done
+```
+
+| Specialist | Service type | Port | Price (USDC) |
+| --- | --- | --- | --- |
+| mandarin_macro | translation | 7401 | $0.000150 |
+| twitter_sentiment | market_sentiment | 7402 | $0.000080 |
+| polymarket_structurer | polymarket_structuring | 7403 | $0.000050 |
+| whale_tracker_eth | whale_tracking | 7404 | $0.000300 |
+| risk_checker | risk_evaluation | 7405 | $0.000120 |
+| news_summarizer | news_summarization | 7406 | $0.000100 |
+| kelly_sizer | capital_allocation | 7407 | $0.000070 |
+| onchain_dex_data | dex_telemetry | 7408 | $0.000250 |
+
+## Run Atlas against them
+
+```bash
+source .env.example   # or set the *_URL vars individually
 python atlas/main.py
 ```
+
+Atlas composes translation → sentiment → structuring → kelly_sizer and logs
+the full composition with per-step costs and trace CIDs.
 
 ## Tests
 

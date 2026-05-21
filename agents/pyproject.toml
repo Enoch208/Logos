@@ -2,6 +2,7 @@
 testpaths = ["tests"]
 asyncio_mode = "auto"
 addopts = "-q"
+pythonpath = ["."]
 
 [tool.ruff]
 line-length = 100

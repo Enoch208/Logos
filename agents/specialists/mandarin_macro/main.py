@@ -73,5 +73,8 @@ class MandarinMacro(Specialist):
         return result
 
 
+SPECIALIST = MandarinMacro()
+
+
 if __name__ == "__main__":
-    run(MandarinMacro(), port=7401)
+    run(SPECIALIST, port=7401)

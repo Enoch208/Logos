@@ -106,6 +106,33 @@ async def run_atlas(client: LogosClient) -> Composition:
             )
         )
 
+    if "capital_allocation" in client.specialist_directory:
+        print("[atlas] procuring Kelly sizing from kelly_sizer …")
+        # Derive an edge percentage from the sentiment score if we have it,
+        # else fall back to a small positive edge.
+        sentiment_score = 0.0
+        for s in steps:
+            if s.service_type == "market_sentiment":
+                sentiment_score = float(s.response.get("sentiment_score", 0.0))
+        edge_pct = abs(sentiment_score) * 15.0  # heuristic v1
+        sizing_payload = {"edge_percentage": edge_pct, "odds_fraction": 1.0}
+        sizing = await client.query(
+            service_type="capital_allocation",
+            payload=sizing_payload,
+            max_price_usdc=0.0005,
+        )
+        steps.append(
+            CompositionStep(
+                sequence=len(steps) + 1,
+                specialist="kelly_sizer",
+                service_type="capital_allocation",
+                payload=sizing_payload,
+                response=sizing.payload,
+                cost_usdc=0.000070,
+                trace_cid=sizing.trace_cid,
+            )
+        )
+
     composition = Composition(
         market_question=(
             "Will the People's Bank of China (PBoC) cut the 1-Year Loan Prime Rate "
@@ -132,6 +159,7 @@ def _build_client() -> LogosClient:
         ("translation", "MANDARIN_MACRO_URL"),
         ("market_sentiment", "TWITTER_SENTIMENT_URL"),
         ("polymarket_structuring", "POLYMARKET_STRUCTURER_URL"),
+        ("capital_allocation", "KELLY_SIZER_URL"),
     ]:
         url = os.environ.get(env_var)
         if url:
