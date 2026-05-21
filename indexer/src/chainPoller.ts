@@ -5,6 +5,8 @@ import {
   type PublicClient,
   formatUnits,
   hexToString,
+  keccak256,
+  stringToBytes,
   trim,
 } from "viem";
 import { config } from "./config.js";
@@ -100,10 +102,14 @@ const SERVICE_BY_HASH = buildServiceLookup();
 
 function buildServiceLookup(): Map<string, { name: string; service: string }> {
   const map = new Map<string, { name: string; service: string }>();
-  // Best-effort: the chain only stores keccak hashes. We seed common hashes
-  // here so the dashboard can show readable service types. Unknown hashes
-  // fall back to raw hex.
+  // The Python specialist derives its agentId as
+  //   keccak256(utf8 bytes("logos-agent:" + name))
+  // — `logos.canonical.keccak_text` on the agents side. Mirror that here so
+  // the dashboard can translate on-chain agentIds back to human names.
   for (const s of SEED_SPECIALISTS) {
+    const derived = keccak256(stringToBytes(`logos-agent:${s.name}`));
+    map.set(derived.toLowerCase(), { name: s.name, service: s.serviceType });
+    // Also seed the mock-data id so chainPoller and mock mode share names.
     map.set(s.id.toLowerCase(), { name: s.name, service: s.serviceType });
   }
   return map;
@@ -181,13 +187,6 @@ export function startChainPoller(
     };
   }
 
-  function statusEnumToString(status: number): QueryStatus {
-    // Solidity enum order: None(0), Open(1), Attested(2), Rated(3), Expired(4)
-    if (status === 2) return "ATTESTED";
-    if (status === 3) return "RATED";
-    return "ESCROWED";
-  }
-
   function describeSpecialist(agentId: string) {
     const hit = SERVICE_BY_HASH.get(agentId.toLowerCase());
     if (hit)
@@ -201,7 +200,11 @@ export function startChainPoller(
     };
   }
 
-  async function emitForQuery(queryId: `0x${string}`, rating?: number) {
+  async function emitForQuery(
+    queryId: `0x${string}`,
+    status: QueryStatus,
+    rating?: number,
+  ) {
     try {
       const q = await readQueryAndOffer(queryId);
       const { specialistId, serviceType } = describeSpecialist(q.agentId);
@@ -212,10 +215,14 @@ export function startChainPoller(
         specialistId,
         serviceType,
         costUsdc: Number(formatUnits(q.pricePerQuery, 6)),
-        status: statusEnumToString(q.status),
+        // Status reflects the EVENT that fired, not the chain's current
+        // state — by the time we enrich, the query may have advanced past
+        // the event we're processing.
+        status,
         ...(rating !== undefined ? { rating } : {}),
         traceCid: bytes32ToCid(q.traceCID),
       };
+      console.log(`[chainPoller] ${status} ${queryId.slice(0, 14)}… ${specialistId}`);
       await recordTransaction(tx);
       onTx(tx);
     } catch (err) {
@@ -231,7 +238,7 @@ export function startChainPoller(
       onLogs: (logs) => {
         for (const log of logs) {
           const id = (log as { args?: { queryId?: `0x${string}` } }).args?.queryId;
-          if (id) void emitForQuery(id);
+          if (id) void emitForQuery(id, "ESCROWED");
         }
       },
     }),
@@ -242,7 +249,7 @@ export function startChainPoller(
       onLogs: (logs) => {
         for (const log of logs) {
           const id = (log as { args?: { queryId?: `0x${string}` } }).args?.queryId;
-          if (id) void emitForQuery(id);
+          if (id) void emitForQuery(id, "ATTESTED");
         }
       },
     }),
@@ -253,7 +260,7 @@ export function startChainPoller(
       onLogs: (logs) => {
         for (const log of logs) {
           const id = (log as { args?: { queryId?: `0x${string}` } }).args?.queryId;
-          if (id) void emitForQuery(id, ratingFromLog(log));
+          if (id) void emitForQuery(id, "RATED", ratingFromLog(log));
         }
       },
     }),

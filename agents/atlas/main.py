@@ -171,9 +171,22 @@ def _build_client() -> LogosClient:
             "translation=http://localhost:7401",
             file=sys.stderr,
         )
+    from logos.contracts import ChainBridge, ChainConfig
+
+    bridge = None
+    cfg = ChainConfig.from_env()
+    pk = os.environ.get("ATLAS_PRIVATE_KEY")
+    if cfg and pk:
+        bridge = ChainBridge(cfg, private_key=pk)
+        print(f"[atlas] chain mode · chainId={cfg.chain_id} · marketplace={cfg.marketplace[:14]}…")
+    else:
+        print("[atlas] off-chain mode · no chain creds wired")
+
     return LogosClient(
         specialist_directory=directory,
-        wallet_private_key=os.environ.get("ATLAS_PRIVATE_KEY"),
+        wallet_private_key=pk,
+        chain_bridge=bridge,
+        auto_rate=5 if bridge else None,
     )
 
 
