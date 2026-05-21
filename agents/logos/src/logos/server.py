@@ -37,7 +37,7 @@ from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
 
 from .canonical import canonical_dumps, keccak_hex, keccak_text
-from .contracts import ChainBridge, ChainConfig, _hex0x
+from .contracts import ChainBridge, ChainConfig, _hex0x, _to_bytes32
 from .ipfs import pin_trace
 from .schemas import validate_response
 from .signing import sign_attestation
@@ -251,16 +251,22 @@ def build_app(specialist: Specialist) -> FastAPI:
 
 
 async def _ensure_offer(bridge: ChainBridge, specialist: Specialist, endpoint: str) -> str:
-    """Registers the agent (idempotent) and publishes an offer if one isn't
-    cached. Returns the offer id.
-
-    v1: simplistic — always publishes a fresh offer at boot. Real impl
-    would check on-chain for an existing active offer first.
+    """Registers the agent (idempotent) and returns an active offer id for
+    it. Reuses the most recent active OfferPublished event if one exists,
+    otherwise publishes a fresh offer. This makes restarts cheap — without
+    it every fleet boot would publish 8 fresh offers and burn deployer gas
+    on every restart even though the previous offers are still on-chain
+    and active.
     """
     try:
         bridge.register_agent(specialist.agent_id, f"ipfs://specialist/{specialist.name}")
     except Exception:
         pass  # already registered; ignore
+
+    cached = _find_active_offer(bridge, specialist.agent_id)
+    if cached is not None:
+        return cached
+
     tx_hash = bridge.publish_offer(
         agent_id=specialist.agent_id,
         service_type_hash=specialist.service_type_hash,
@@ -279,6 +285,37 @@ async def _ensure_offer(bridge: ChainBridge, specialist: Specialist, endpoint: s
         # querying offers(agentId) once that view is exposed.
         return keccak_text(f"offer:{specialist.name}:{tx_hash}")
     return _hex0x(events[0]["args"]["offerId"])
+
+
+def _find_active_offer(bridge: ChainBridge, agent_id: str) -> str | None:
+    """Scans the recent past for OfferPublished(agentId=...) events and
+    returns the most recent offer that is still flagged active on-chain.
+    Looks back ~14 days at 4s/block; tweak if blocks-per-day changes."""
+    try:
+        latest = bridge.w3.eth.block_number
+        lookback_blocks = 14 * 24 * 60 * 60 // 4  # ~14 days at 4s/block
+        from_block = max(0, latest - lookback_blocks)
+        logs = bridge.marketplace.events.OfferPublished().get_logs(
+            from_block=from_block,
+            argument_filters={"agentId": _to_bytes32(agent_id)},
+        )
+    except Exception as e:
+        print(f"[server] could not scan past offers ({e}); will publish fresh", flush=True)
+        return None
+
+    # Newest first — first active one wins.
+    for log in reversed(list(logs)):
+        offer_id_bytes = log["args"]["offerId"]
+        try:
+            offer = bridge.marketplace.functions.offers(offer_id_bytes).call()
+        except Exception:
+            continue
+        # offers(bytes32) returns (agentId, serviceTypeHash, schemaHash,
+        # pricePerQuery, endpointURL, active) — `active` is the 6th field.
+        if len(offer) >= 6 and bool(offer[5]):
+            return _hex0x(offer_id_bytes)
+
+    return None
 
 
 def run(specialist: Specialist, *, host: str = "0.0.0.0", port: int = 0) -> None:
