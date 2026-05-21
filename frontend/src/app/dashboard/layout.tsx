@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { DashboardSidebar } from "@/components/dashboard/layout/DashboardSidebar";
 import { DashboardTopbar } from "@/components/dashboard/layout/DashboardTopbar";
+import { Web3Provider } from "@/components/providers/Web3Provider";
 import { DashboardNavProvider } from "@/lib/dashboard-nav";
 
 export const metadata: Metadata = {
@@ -15,14 +16,16 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <DashboardNavProvider>
-      <div className="flex min-h-screen w-full bg-canvas text-foreground">
-        <DashboardSidebar />
-        <div className="flex min-w-0 flex-1 flex-col">
-          <DashboardTopbar />
-          <main className="flex-1">{children}</main>
+    <Web3Provider>
+      <DashboardNavProvider>
+        <div className="flex min-h-screen w-full bg-canvas text-foreground">
+          <DashboardSidebar />
+          <div className="flex min-w-0 flex-1 flex-col">
+            <DashboardTopbar />
+            <main className="flex-1">{children}</main>
+          </div>
         </div>
-      </div>
-    </DashboardNavProvider>
+      </DashboardNavProvider>
+    </Web3Provider>
   );
 }

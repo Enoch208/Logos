@@ -9,6 +9,7 @@ import {
 } from "hugeicons-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { ConnectWallet } from "@/components/dashboard/ConnectWallet";
 import { useDashboardNav } from "@/lib/dashboard-nav";
 
 const ROUTE_LABELS: Record<string, string> = {
@@ -72,6 +73,7 @@ export function DashboardTopbar() {
           Landing
           <ArrowUpRight01Icon size={12} strokeWidth={1.5} className="text-muted" />
         </Link>
+        <ConnectWallet />
       </div>
     </header>
   );
