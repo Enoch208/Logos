@@ -4,7 +4,7 @@ Frontend lives on Vercel. The VPS hosts the two backend services:
 
 | Process | Port | Public hostname |
 | --- | --- | --- |
-| `logos-indexer` (Node) | 4000 | `api.logos.yourdomain.com` |
+| `logos-indexer` (Node) | 4001 | `api.logos.yourdomain.com` |
 | `logos-fleet` (Python) | 8080 | `agents.logos.yourdomain.com` |
 
 Cloudflared handles TLS at the edge — no nginx, no certbot, no firewall ports to open.
@@ -53,7 +53,7 @@ pm2 save
 
 ### `indexer/.env`
 ```
-PORT=4000
+PORT=4001
 ARC_RPC_URL=https://rpc.testnet.arc.network
 ARC_CHAIN_ID=5042002
 AGENT_REGISTRY_ADDRESS=0x3114f3fA3879324a28035bcAdE6425051CC07bBe

@@ -20,7 +20,7 @@ originRequest:
 
 ingress:
   - hostname: api.logos.yourdomain.com
-    service: http://localhost:4000
+    service: http://localhost:4001
     originRequest:
       # /ws/feed needs no special config — cloudflared upgrades WebSocket
       # connections automatically.

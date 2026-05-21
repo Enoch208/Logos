@@ -22,11 +22,11 @@ module.exports = {
       interpreter: "node",
       env: {
         NODE_ENV: "production",
-        PORT: "4000",
+        PORT: "4001",
       },
       env_production: {
         NODE_ENV: "production",
-        PORT: "4000",
+        PORT: "4001",
       },
       autorestart: true,
       max_restarts: 10,
