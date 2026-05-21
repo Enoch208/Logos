@@ -1,0 +1,30 @@
+{
+  "name": "logos-indexer",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Logos marketplace indexer — reads Arc testnet events, exposes REST + WebSocket for the dashboard.",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.13.7",
+    "dotenv": "^16.4.5",
+    "hono": "^4.6.10",
+    "mongodb": "^6.10.0",
+    "viem": "^2.21.43",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "@types/ws": "^8.5.13",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3",
+    "vitest": "^4.1.7"
+  }
+}
