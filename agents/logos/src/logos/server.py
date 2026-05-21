@@ -94,11 +94,35 @@ class ServerState:
     offer_id: str | None = None
 
 
+# Fleet mode: when multiple specialists run in a single process (one
+# FastAPI app per specialist, all mounted under one parent), the parent
+# does on-chain registration sequentially BEFORE the children's lifespans
+# fire. It populates this dict; each child's lifespan reads its own entry
+# and skips the per-specialist init that would otherwise race the deployer
+# nonce.
+FLEET_REGISTRY: dict[str, tuple[ChainBridge, str]] = {}
+
+
+def register_in_fleet(name: str, bridge: ChainBridge, offer_id: str) -> None:
+    FLEET_REGISTRY[name] = (bridge, offer_id)
+
+
 def build_app(specialist: Specialist) -> FastAPI:
     state = ServerState()
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+        # Fleet mode: bridge + offer already provisioned by the parent.
+        fleet_entry = FLEET_REGISTRY.get(specialist.name)
+        if fleet_entry is not None:
+            state.bridge, state.offer_id = fleet_entry
+            print(
+                f"[server] {specialist.name} bound to fleet · "
+                f"offer_id={state.offer_id[:14]}…"
+            )
+            yield
+            return
+
         cfg = ChainConfig.from_env()
         if cfg:
             try:
@@ -119,16 +143,27 @@ def build_app(specialist: Specialist) -> FastAPI:
 
     app = FastAPI(title=f"logos-specialist:{specialist.name}", lifespan=lifespan)
 
+    def _live_state() -> tuple[ChainBridge | None, str | None]:
+        """Read the freshest bridge + offer_id from either local state or
+        the FLEET_REGISTRY. Fleet mode populates the registry from the
+        parent lifespan, which may finish AFTER this child's lifespan has
+        already passed its own check — so we re-resolve at request time."""
+        fleet_entry = FLEET_REGISTRY.get(specialist.name)
+        if fleet_entry is not None:
+            return fleet_entry
+        return state.bridge, state.offer_id
+
     @app.get("/health")
     async def health() -> dict[str, Any]:
+        bridge, offer_id = _live_state()
         return {
             "ok": True,
             "specialist": specialist.name,
             "service_type": specialist.service_type,
             "price_per_query_usdc_6": specialist.price_per_query_usdc_6,
             "agent_id": specialist.agent_id,
-            "offer_id": state.offer_id,
-            "on_chain": state.bridge is not None,
+            "offer_id": offer_id,
+            "on_chain": bridge is not None,
         }
 
     @app.get("/schema")
@@ -186,10 +221,11 @@ def build_app(specialist: Specialist) -> FastAPI:
             trace_cid=trace_anchor,
         )
 
+        bridge_now, _offer_now = _live_state()
         attest_tx = None
-        if state.bridge is not None:
+        if bridge_now is not None:
             try:
-                attest_tx = state.bridge.attest_response(
+                attest_tx = bridge_now.attest_response(
                     query_id=query_id,
                     response_hash=response_hash,
                     trace_cid=trace_anchor,
