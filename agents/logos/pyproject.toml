@@ -2,7 +2,7 @@
 name = "logos"
 version = "0.1.0"
 description = "Logos marketplace SDK — specialist runner + trader client + x402 middleware"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.32",
@@ -33,4 +33,4 @@ asyncio_mode = "auto"
 
 [tool.ruff]
 line-length = 100
-target-version = "py311"
+target-version = "py310"
