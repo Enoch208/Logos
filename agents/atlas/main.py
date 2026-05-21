@@ -1,11 +1,20 @@
 """Atlas — the flagship Polymarket V2 trader.
 
-Atlas owns no opinions. It procures translation, sentiment, and structuring
-from the marketplace, composes them into a binary bet, and posts to a
-Polymarket V2 contract (or paper-trades against one).
+Atlas owns no opinions. It procures translation, sentiment, structuring, and
+Kelly sizing from the marketplace, composes them into a binary bet, and
+routes to Polymarket V2 (stubbed behind `_route_to_polymarket`).
 
-This v1 demonstrates the *composition* — the Polymarket V2 post is stubbed
-behind `_route_to_polymarket` so the demo runs without external chain calls.
+Two run modes:
+- single (default): one composition, then exit.
+- loop: set ATLAS_LOOP_INTERVAL=<seconds> (or pass --loop <seconds>) and
+  Atlas fires a composition on that cadence forever, rotating through a
+  set of market scenarios so the marketplace shows continuous, varied
+  activity — judges hitting the dashboard at any time see fresh volume.
+
+Each composition fires ~12 on-chain txs (recordQuery + rate per
+specialist, plus the specialists' attestResponse), so the interval is the
+gas-burn knob: every 10 min ≈ 0.4 ETH/hr on Arc testnet at the time of
+writing. Tune to taste.
 """
 
 from __future__ import annotations
@@ -13,7 +22,7 @@ from __future__ import annotations
 import asyncio
 import os
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from logos.client import LogosClient
@@ -41,16 +50,68 @@ class Composition:
         return sum(s.cost_usdc for s in self.steps)
 
 
-PBoC_URL = "https://www.pbc.gov.cn/goutongjiaoliu/108521/index.html"
+@dataclass
+class Scenario:
+    market_question: str
+    translation_input: dict[str, Any]
+    sentiment_query: str
+    prediction: str
+    conviction: float
 
 
-async def run_atlas(client: LogosClient) -> Composition:
+# Rotated through in loop mode so the live feed isn't identical every cycle.
+SCENARIOS: list[Scenario] = [
+    Scenario(
+        market_question=(
+            "Will the People's Bank of China cut the 1-Year Loan Prime Rate "
+            "before the next quarterly review?"
+        ),
+        translation_input={"text_url": "https://www.pbc.gov.cn/goutongjiaoliu/108521/index.html"},
+        sentiment_query="PBOC LPR cut China financial sentiment",
+        prediction="No Cut",
+        conviction=0.88,
+    ),
+    Scenario(
+        market_question="Will the Federal Reserve hold rates at its next FOMC meeting?",
+        translation_input={
+            "raw_text": "美联储官员表示通胀压力仍需观察，短期内维持利率不变的可能性较大。"
+        },
+        sentiment_query="Federal Reserve FOMC rate hold expectations",
+        prediction="Hold",
+        conviction=0.74,
+    ),
+    Scenario(
+        market_question="Will spot Ethereum ETFs see net positive inflows this week?",
+        translation_input={"raw_text": "以太坊现货ETF本周资金流入预期保持乐观，机构需求稳定。"},
+        sentiment_query="Ethereum spot ETF inflows institutional demand",
+        prediction="Net Inflows",
+        conviction=0.66,
+    ),
+    Scenario(
+        market_question="Will Bitcoin close above its prior all-time high by month end?",
+        translation_input={"raw_text": "比特币市场情绪偏向谨慎乐观，链上数据显示长期持有者增持。"},
+        sentiment_query="Bitcoin all-time high momentum on-chain accumulation",
+        prediction="Above ATH",
+        conviction=0.58,
+    ),
+    Scenario(
+        market_question="Will the ECB signal a dovish pivot at its next press conference?",
+        translation_input={"raw_text": "欧洲央行内部对降息节奏存在分歧，市场预期略偏鸽派。"},
+        sentiment_query="ECB dovish pivot euro rates expectations",
+        prediction="Dovish",
+        conviction=0.61,
+    ),
+]
+
+
+async def run_atlas(client: LogosClient, scenario: Scenario) -> Composition:
     steps: list[CompositionStep] = []
 
+    print(f"[atlas] market: {scenario.market_question}")
     print("[atlas] procuring translation from mandarin_macro …")
     translation = await client.query(
         service_type="translation",
-        payload={"text_url": PBoC_URL},
+        payload=scenario.translation_input,
         max_price_usdc=0.0005,
     )
     steps.append(
@@ -58,7 +119,7 @@ async def run_atlas(client: LogosClient) -> Composition:
             sequence=1,
             specialist="mandarin_macro",
             service_type="translation",
-            payload={"text_url": PBoC_URL},
+            payload=scenario.translation_input,
             response=translation.payload,
             cost_usdc=0.000150,
             trace_cid=translation.trace_cid,
@@ -69,7 +130,7 @@ async def run_atlas(client: LogosClient) -> Composition:
         print("[atlas] procuring sentiment from twitter_sentiment …")
         sentiment = await client.query(
             service_type="market_sentiment",
-            payload={"query": "PBOC LPR Cut Chinese Financial Twitter Data"},
+            payload={"query": scenario.sentiment_query},
             max_price_usdc=0.0005,
         )
         steps.append(
@@ -77,7 +138,7 @@ async def run_atlas(client: LogosClient) -> Composition:
                 sequence=2,
                 specialist="twitter_sentiment",
                 service_type="market_sentiment",
-                payload={"query": "PBOC LPR Cut"},
+                payload={"query": scenario.sentiment_query},
                 response=sentiment.payload,
                 cost_usdc=0.000080,
                 trace_cid=sentiment.trace_cid,
@@ -86,12 +147,13 @@ async def run_atlas(client: LogosClient) -> Composition:
 
     if "polymarket_structuring" in client.specialist_directory:
         print("[atlas] procuring structuring from polymarket_structurer …")
+        structuring_payload = {
+            "prediction": scenario.prediction,
+            "conviction": scenario.conviction,
+        }
         structuring = await client.query(
             service_type="polymarket_structuring",
-            payload={
-                "prediction": "No Cut",
-                "conviction": 0.88,
-            },
+            payload=structuring_payload,
             max_price_usdc=0.0005,
         )
         steps.append(
@@ -99,7 +161,7 @@ async def run_atlas(client: LogosClient) -> Composition:
                 sequence=3,
                 specialist="polymarket_structurer",
                 service_type="polymarket_structuring",
-                payload={"prediction": "No Cut", "conviction": 0.88},
+                payload=structuring_payload,
                 response=structuring.payload,
                 cost_usdc=0.000050,
                 trace_cid=structuring.trace_cid,
@@ -108,8 +170,6 @@ async def run_atlas(client: LogosClient) -> Composition:
 
     if "capital_allocation" in client.specialist_directory:
         print("[atlas] procuring Kelly sizing from kelly_sizer …")
-        # Derive an edge percentage from the sentiment score if we have it,
-        # else fall back to a small positive edge.
         sentiment_score = 0.0
         for s in steps:
             if s.service_type == "market_sentiment":
@@ -134,10 +194,7 @@ async def run_atlas(client: LogosClient) -> Composition:
         )
 
     composition = Composition(
-        market_question=(
-            "Will the People's Bank of China (PBoC) cut the 1-Year Loan Prime Rate "
-            "(LPR) before May 25, 2026?"
-        ),
+        market_question=scenario.market_question,
         target_venue="Polymarket V2",
         steps=steps,
     )
@@ -190,11 +247,9 @@ def _build_client() -> LogosClient:
     )
 
 
-async def _main() -> None:
-    client = _build_client()
-    composition = await run_atlas(client)
+def _print_composition(composition: Composition) -> None:
     print(
-        f"\n[atlas] composition complete · ${composition.total_cost_usdc:.6f} USDC · "
+        f"[atlas] composition complete · ${composition.total_cost_usdc:.6f} USDC · "
         f"{len(composition.steps)} step(s)"
     )
     for step in composition.steps:
@@ -202,6 +257,39 @@ async def _main() -> None:
             f"  #{step.sequence} {step.specialist:<24} "
             f"${step.cost_usdc:.6f} → trace {step.trace_cid[:20]}…"
         )
+
+
+def _loop_interval() -> int:
+    """Seconds between compositions in loop mode; 0 = single run.
+    `--loop <seconds>` overrides the ATLAS_LOOP_INTERVAL env var."""
+    if "--loop" in sys.argv:
+        i = sys.argv.index("--loop")
+        if i + 1 < len(sys.argv):
+            return int(sys.argv[i + 1])
+        return 600
+    return int(os.environ.get("ATLAS_LOOP_INTERVAL", "0"))
+
+
+async def _main() -> None:
+    client = _build_client()
+    interval = _loop_interval()
+
+    if interval <= 0:
+        composition = await run_atlas(client, SCENARIOS[0])
+        _print_composition(composition)
+        return
+
+    print(f"[atlas] loop mode · firing a composition every {interval}s", flush=True)
+    cycle = 0
+    while True:
+        scenario = SCENARIOS[cycle % len(SCENARIOS)]
+        cycle += 1
+        try:
+            composition = await run_atlas(client, scenario)
+            _print_composition(composition)
+        except Exception as e:  # one bad cycle shouldn't kill the loop
+            print(f"[atlas] cycle {cycle} failed: {e}", file=sys.stderr, flush=True)
+        await asyncio.sleep(interval)
 
 
 if __name__ == "__main__":
