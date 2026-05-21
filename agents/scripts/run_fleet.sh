@@ -19,5 +19,16 @@ if [ ! -x "$VENV_PYTHON" ]; then
 fi
 
 cd "$AGENTS_DIR"
+
+# PM2 doesn't auto-load .env and the Python side doesn't either, so load it
+# here. Without this ChainConfig.from_env() can't see the Arc creds and the
+# fleet silently boots off-chain even though the file is right there.
+if [ -f .env ]; then
+    set -a
+    # shellcheck source=/dev/null
+    source .env
+    set +a
+fi
+
 export PYTHONPATH="${PYTHONPATH:-.}"
 exec "$VENV_PYTHON" -m fleet.main
