@@ -42,18 +42,16 @@ module.exports = {
     {
       name: "logos-fleet",
       cwd: "./agents",
-      // Run the consolidated FastAPI app via the venv's python so the
-      // installed `logos` package + `specialists.*` modules are importable.
-      script: "fleet/main.py",
-      interpreter: "./.venv/bin/python",
+      // Launcher cd's to agents/ and exec's the venv's python — sidesteps
+      // PM2's flaky relative interpreter resolution. PM2 runs the .sh via
+      // its default shell, no `interpreter` field needed.
+      script: "./scripts/run_fleet.sh",
       env: {
         PORT: "8080",
-        PYTHONPATH: ".",
         PYTHONUNBUFFERED: "1",
       },
       env_production: {
         PORT: "8080",
-        PYTHONPATH: ".",
         PYTHONUNBUFFERED: "1",
       },
       autorestart: true,

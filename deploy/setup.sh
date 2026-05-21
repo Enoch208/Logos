@@ -42,8 +42,13 @@ cd agents
 if [ ! -d .venv ]; then
     python3 -m venv .venv
 fi
-./.venv/bin/pip install --quiet --upgrade pip
-./.venv/bin/pip install --quiet -e ./logos
+./.venv/bin/pip install --upgrade pip
+./.venv/bin/pip install -e ./logos
+if [ ! -x ./.venv/bin/python ]; then
+    echo "❌ agents/.venv/bin/python missing after install — bail" >&2
+    exit 1
+fi
+echo "   agents/.venv/bin/python OK ($(./.venv/bin/python --version))"
 cd "$REPO_DIR"
 
 echo "▸ logs dir"
