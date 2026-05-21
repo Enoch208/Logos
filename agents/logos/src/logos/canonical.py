@@ -42,3 +42,12 @@ def keccak_hex(value: Any) -> str:
     from eth_utils import keccak  # noqa: PLC0415
 
     return "0x" + keccak(canonical_bytes(value)).hex()
+
+
+def keccak_text(text: str) -> str:
+    """Solidity-compatible `keccak256(bytes(text))` — raw UTF-8, no JSON
+    envelope. Use this for service-type and schema hashes that must match
+    the contract's `keccak256("translation")` etc."""
+    from eth_utils import keccak  # noqa: PLC0415
+
+    return "0x" + keccak(text.encode("utf-8")).hex()

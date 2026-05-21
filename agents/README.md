@@ -86,17 +86,40 @@ pip install pytest pytest-asyncio
 pytest
 ```
 
+## On-chain mode
+
+With the four env vars `ARC_RPC_URL`, `ARC_CHAIN_ID`, `MARKETPLACE_ADDRESS`, and `AGENT_REGISTRY_ADDRESS` set, both sides auto-upgrade from "local mock" to "anchored on Arc":
+
+- **Specialist** on startup calls `AgentRegistry.register` + `Marketplace.publishOffer`, caches the resulting `offer_id`, and exposes it on `/health`. After each successful `/run`, it submits `Marketplace.attestResponse` with the signed digest so the dashboard's live feed shows `ATTESTED`.
+
+- **Trader (LogosClient)** with a `ChainBridge` reads the specialist's `offer_id` from `/health`, calls `Marketplace.recordQuery(offerId, payloadHash, paymentAuthHash)` before the paid POST (so the on-chain `queryId` is the one the specialist signs over), and optionally calls `Marketplace.rate(queryId, score)` after success.
+
+```python
+from logos.contracts import ChainBridge, ChainConfig
+
+cfg = ChainConfig.from_env()          # returns None when env is incomplete
+bridge = ChainBridge(cfg, private_key=os.environ["TRADER_PRIVATE_KEY"])
+
+client = LogosClient(
+    specialist_directory={...},
+    chain_bridge=bridge,
+    auto_rate=5,                       # rates every successful query 5/5
+)
+```
+
+When `ChainConfig.from_env()` returns `None`, both sides degrade gracefully — the framework still runs end-to-end against an in-process mock and surfaces a clear "running off-chain only" message on the specialist log.
+
 ## What's stubbed
 
-- **LLM**: `mandarin_macro._translate` is a deterministic lookup. Swap in an OpenAI / Anthropic call when the LLM key is available.
+- **LLM**: `mandarin_macro._translate` (and the other specialists' stub functions) are deterministic lookups. Swap in an OpenAI / Anthropic call when the LLM key is available.
 - **EIP-3009 / Circle Gateway**: the `X-Payment-Auth` header is an opaque keccak token that gets anchored on-chain via `Marketplace.recordQuery`. A future revision replaces it with a real signed authorization that Circle Gateway can settle.
 - **IPFS**: with `WEB3_STORAGE_TOKEN` set, traces pin to web3.storage; without one, they get a `dev:<sha256>` placeholder CID so the contract still gets a stable 32-byte anchor.
 - **Polymarket V2 post**: `atlas._route_to_polymarket` logs what it would post. A future revision wires the CLOB client.
 
-## Wiring into the rest of the monorepo
+## End-to-end wire-up
 
 1. Deploy contracts (see `contracts/`)
-2. Copy `MARKETPLACE_ADDRESS`, `AGENT_REGISTRY_ADDRESS`, `ARC_RPC_URL`, `ARC_CHAIN_ID` into each specialist's env
+2. Set the four `ARC_*` + `*_ADDRESS` env vars
 3. Each specialist registers itself on `AgentRegistry`, publishes an `Offer` on `Marketplace`, and starts its FastAPI server
 4. The indexer (see `indexer/`) picks up the on-chain events and broadcasts to the dashboard
 5. Atlas runs the composition; every paid round-trip emits `QueryRecorded` → `ResponseAttested` → `ResponseRated`, all of which the dashboard renders in real time

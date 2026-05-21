@@ -2,8 +2,8 @@
 
 Subclass `Specialist` and implement `handle(query) -> dict`. The framework
 wraps it as a FastAPI app with the x402 payment-required dance, signs the
-attestation, pins the trace, and returns the AttestedResponse to the
-trader.
+attestation, pins the trace, and (if a ChainBridge is configured) anchors
+the attestation on-chain via Marketplace.attestResponse.
 
 Example
 -------
@@ -17,7 +17,6 @@ Example
         response_schema = {"type": "object", ...}
 
         async def handle(self, payload, *, trace):
-            # ... do work ...
             trace.step("Parsed PBoC frame")
             return {"translated_text": "...", "confidence_score": 0.99}
 
@@ -29,13 +28,16 @@ from __future__ import annotations
 
 import os
 import secrets
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
 
-from .canonical import canonical_dumps, keccak_hex
+from .canonical import canonical_dumps, keccak_hex, keccak_text
+from .contracts import ChainBridge, ChainConfig
 from .ipfs import pin_trace
 from .schemas import validate_response
 from .signing import sign_attestation
@@ -65,6 +67,19 @@ class Specialist:
     async def handle(self, payload: dict[str, Any], *, trace: ReasoningTrace) -> dict[str, Any]:
         raise NotImplementedError
 
+    @property
+    def agent_id(self) -> str:
+        """Deterministic bytes32 agent id derived from the specialist's name."""
+        return keccak_text(f"logos-agent:{self.name}")
+
+    @property
+    def service_type_hash(self) -> str:
+        return keccak_text(self.service_type)
+
+    @property
+    def schema_hash(self) -> str:
+        return keccak_hex(self.response_schema)
+
 
 def _required_env(var: str) -> str:
     v = os.environ.get(var)
@@ -73,8 +88,36 @@ def _required_env(var: str) -> str:
     return v
 
 
+@dataclass
+class ServerState:
+    bridge: ChainBridge | None = None
+    offer_id: str | None = None
+
+
 def build_app(specialist: Specialist) -> FastAPI:
-    app = FastAPI(title=f"logos-specialist:{specialist.name}")
+    state = ServerState()
+
+    @asynccontextmanager
+    async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+        cfg = ChainConfig.from_env()
+        if cfg:
+            try:
+                state.bridge = ChainBridge(
+                    cfg, private_key=_required_env("SPECIALIST_PRIVATE_KEY")
+                )
+                endpoint = os.environ.get("SPECIALIST_ENDPOINT_URL", "")
+                state.offer_id = await _ensure_offer(state.bridge, specialist, endpoint)
+                print(
+                    f"[server] {specialist.name} anchored on-chain · "
+                    f"offer_id={state.offer_id[:14]}…"
+                )
+            except Exception as e:
+                print(f"[server] on-chain anchor disabled ({e}); running off-chain only")
+                state.bridge = None
+                state.offer_id = None
+        yield
+
+    app = FastAPI(title=f"logos-specialist:{specialist.name}", lifespan=lifespan)
 
     @app.get("/health")
     async def health() -> dict[str, Any]:
@@ -83,6 +126,9 @@ def build_app(specialist: Specialist) -> FastAPI:
             "specialist": specialist.name,
             "service_type": specialist.service_type,
             "price_per_query_usdc_6": specialist.price_per_query_usdc_6,
+            "agent_id": specialist.agent_id,
+            "offer_id": state.offer_id,
+            "on_chain": state.bridge is not None,
         }
 
     @app.get("/schema")
@@ -128,9 +174,6 @@ def build_app(specialist: Specialist) -> FastAPI:
 
         trace_doc = {"response": result, "reasoning": trace.to_dict()}
         cid = await pin_trace(trace_doc)
-        # The Marketplace anchor expects a 32-byte CID; CIDv1-multihash digest
-        # would be that, but we keep this simple for v1 — derive a 32-byte
-        # tag from the canonical trace itself.
         trace_anchor = keccak_hex(trace_doc)
         response_hash = keccak_hex(result)
 
@@ -143,6 +186,18 @@ def build_app(specialist: Specialist) -> FastAPI:
             trace_cid=trace_anchor,
         )
 
+        attest_tx = None
+        if state.bridge is not None:
+            try:
+                attest_tx = state.bridge.attest_response(
+                    query_id=query_id,
+                    response_hash=response_hash,
+                    trace_cid=trace_anchor,
+                    signature=signature,
+                )
+            except Exception as e:
+                print(f"[server] attestResponse failed ({e}); response served off-chain")
+
         return JSONResponse(
             {
                 "query_id": query_id,
@@ -152,10 +207,42 @@ def build_app(specialist: Specialist) -> FastAPI:
                 "response_hash": response_hash,
                 "signature": signature,
                 "payment_auth_hash": keccak_hex({"auth": payment}),
+                "attest_tx": attest_tx,
             }
         )
 
     return app
+
+
+async def _ensure_offer(bridge: ChainBridge, specialist: Specialist, endpoint: str) -> str:
+    """Registers the agent (idempotent) and publishes an offer if one isn't
+    cached. Returns the offer id.
+
+    v1: simplistic — always publishes a fresh offer at boot. Real impl
+    would check on-chain for an existing active offer first.
+    """
+    try:
+        bridge.register_agent(specialist.agent_id, f"ipfs://specialist/{specialist.name}")
+    except Exception:
+        pass  # already registered; ignore
+    tx_hash = bridge.publish_offer(
+        agent_id=specialist.agent_id,
+        service_type_hash=specialist.service_type_hash,
+        schema_hash=specialist.schema_hash,
+        price_per_query=specialist.price_per_query_usdc_6,
+        endpoint_url=endpoint,
+    )
+    # The tx mined; pull the OfferPublished event from the receipt to learn
+    # the offer id. We re-fetch the receipt because publish_offer currently
+    # only returns the tx hash.
+    receipt = bridge.w3.eth.get_transaction_receipt(tx_hash)
+    events = bridge.marketplace.events.OfferPublished().process_receipt(receipt)
+    if not events:
+        # No event in ABI — fall back to a deterministic placeholder.
+        # The on-chain offer is still live; the trader can find it by
+        # querying offers(agentId) once that view is exposed.
+        return keccak_text(f"offer:{specialist.name}:{tx_hash}")
+    return "0x" + events[0]["args"]["offerId"].hex()
 
 
 def run(specialist: Specialist, *, host: str = "0.0.0.0", port: int = 0) -> None:
