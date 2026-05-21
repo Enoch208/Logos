@@ -10,7 +10,7 @@ from typing import Any
 
 import httpx
 
-from logos.llm import LLMUnavailable, llm_structured
+from logos.llm import LLMUnavailable, llm_structured_async
 from logos.server import ReasoningTrace, Specialist, run
 
 SCHEMA: dict[str, Any] = {
@@ -93,7 +93,7 @@ class NewsSummarizer(Specialist):
             return _stub(url)
 
         try:
-            result = llm_structured(
+            result = await llm_structured_async(
                 system=SYSTEM_PROMPT,
                 user={"source_url": url, "source_text": raw or url},
                 schema=SCHEMA,

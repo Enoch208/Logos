@@ -15,6 +15,8 @@ demos without burning API credits.
 
 from __future__ import annotations
 
+import asyncio
+import functools
 import json
 import os
 from typing import Any
@@ -57,7 +59,10 @@ def llm_structured(
     user_text = user if isinstance(user, str) else json.dumps(user, sort_keys=True)
 
     try:
-        client = OpenAI()
+        # Bounded timeout so a slow/hung OpenAI call can't outlive the
+        # cloudflared edge timeout (30s) and leave the trader with an empty
+        # response. We'd rather raise LLMUnavailable and fall back to the stub.
+        client = OpenAI(timeout=20.0, max_retries=1)
         resp = client.chat.completions.create(
             model=model or DEFAULT_MODEL,
             temperature=temperature,
@@ -84,6 +89,29 @@ def llm_structured(
         return json.loads(content)
     except json.JSONDecodeError as e:
         raise LLMUnavailable(f"OpenAI response was not valid JSON: {e}") from e
+
+
+async def llm_structured_async(
+    *,
+    system: str,
+    user: str | dict[str, Any],
+    schema: dict[str, Any],
+    model: str | None = None,
+    temperature: float = 0.0,
+) -> dict[str, Any]:
+    """Async wrapper. The OpenAI SDK call is synchronous and blocks for a
+    few seconds; running it directly inside an `async def` handler would
+    stall uvicorn's event loop (and under load, drop connections with an
+    empty body). Offload to a worker thread instead."""
+    call = functools.partial(
+        llm_structured,
+        system=system,
+        user=user,
+        schema=schema,
+        model=model,
+        temperature=temperature,
+    )
+    return await asyncio.to_thread(call)
 
 
 def _strict_schema(schema: dict[str, Any]) -> dict[str, Any]:
