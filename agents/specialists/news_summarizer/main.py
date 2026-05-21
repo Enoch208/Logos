@@ -1,11 +1,16 @@
-"""news_summarizer — pulls a news URL, returns an executive summary + a
-normalised market-impact weight in [-1, 1].
+"""news_summarizer — fetches a news URL (or accepts raw_text), returns an
+executive summary and a normalised market-impact weight in [-1, 1].
+
+LLM-backed when OPENAI_API_KEY is set, deterministic stub otherwise.
 """
 
 from __future__ import annotations
 
 from typing import Any
 
+import httpx
+
+from logos.llm import LLMUnavailable, llm_structured
 from logos.server import ReasoningTrace, Specialist, run
 
 SCHEMA: dict[str, Any] = {
@@ -34,16 +39,36 @@ STUB: dict[str, dict[str, Any]] = {
     },
 }
 
+SYSTEM_PROMPT = (
+    "You are a financial news summariser. Given news source text (often a "
+    "central-bank release, regulatory filing, or major-outlet macro story), "
+    "produce a 1–2 sentence executive_summary capturing the market-relevant "
+    "takeaway, plus a market_impact_weight in [-1, 1] estimating the "
+    "expected direction and magnitude of the move on global risk assets "
+    "(positive = risk-on, negative = risk-off, 0 = neutral). List 2–4 "
+    "key_takeaways as terse bullet phrases."
+)
 
-def _summarise(url: str) -> dict[str, Any]:
+
+def _stub(url: str) -> dict[str, Any]:
     if url in STUB:
         return STUB[url] | {"source_url": url}
     return {
         "source_url": url or "(none)",
-        "executive_summary": "Summary stub — replace _summarise with a real LLM call.",
+        "executive_summary": "Stub — set OPENAI_API_KEY to enable real summarisation.",
         "market_impact_weight": 0.0,
         "key_takeaways": [],
     }
+
+
+async def _fetch(url: str) -> str:
+    try:
+        async with httpx.AsyncClient(timeout=8.0, follow_redirects=True) as c:
+            r = await c.get(url, headers={"User-Agent": "logos-news-summarizer/0.1"})
+            r.raise_for_status()
+            return r.text[:8000]
+    except Exception:
+        return ""
 
 
 class NewsSummarizer(Specialist):
@@ -56,13 +81,32 @@ class NewsSummarizer(Specialist):
         self, payload: dict[str, Any], *, trace: ReasoningTrace
     ) -> dict[str, Any]:
         url = str(payload.get("source_url", ""))
-        trace.step(f"Loaded source {url or '<unspecified>'}")
-        result = _summarise(url)
-        trace.step(
-            f"Compressed to {len(result['executive_summary'])} chars; "
-            f"market_impact_weight={result['market_impact_weight']:.2f}"
-        )
-        return result
+        raw = str(payload.get("raw_text", ""))
+
+        if url and not raw:
+            raw = await _fetch(url)
+            trace.step(f"Fetched {len(raw)} chars from {url}")
+        elif raw:
+            trace.step(f"Summarising {len(raw)} chars of supplied text")
+        else:
+            trace.step("No source supplied — returning stub")
+            return _stub(url)
+
+        try:
+            result = llm_structured(
+                system=SYSTEM_PROMPT,
+                user={"source_url": url, "source_text": raw or url},
+                schema=SCHEMA,
+            )
+            trace.step(
+                f"LLM compressed to {len(result['executive_summary'])} chars; "
+                f"impact={result['market_impact_weight']:.2f}, "
+                f"{len(result.get('key_takeaways', []))} takeaways"
+            )
+            return result
+        except LLMUnavailable as e:
+            trace.step(f"LLM unavailable ({e}); falling back to stub")
+            return _stub(url)
 
 
 SPECIALIST = NewsSummarizer()

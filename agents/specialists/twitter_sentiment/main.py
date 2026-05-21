@@ -1,14 +1,18 @@
-"""twitter_sentiment — composite market sentiment over a topical X/Twitter slice.
+"""twitter_sentiment — composite market sentiment over a topical slice.
 
-Pulls a sample of macro-focused accounts (mocked in v1) and emits a score in
-[-1, 1] with the dominant emotion and sample size. Real implementation would
-swap `_score` with a Twitter API + a small classifier.
+Accepts a free-form query string (or a ticker) and returns a score in
+[-1, 1], the sample size considered, and the dominant emotion label.
+
+When OPENAI_API_KEY is set the LLM does the classification end-to-end.
+When the key isn't set the specialist falls back to a small
+deterministic stub so the demo still runs in pure offline mode.
 """
 
 from __future__ import annotations
 
 from typing import Any
 
+from logos.llm import LLMUnavailable, llm_structured
 from logos.server import ReasoningTrace, Specialist, run
 
 SCHEMA: dict[str, Any] = {
@@ -36,11 +40,20 @@ STUB_SCORES: dict[str, dict[str, Any]] = {
     },
 }
 
+SYSTEM_PROMPT = (
+    "You are a market-sentiment analyst. Given a topic or ticker, infer the "
+    "dominant sentiment among traders and macro-focused commentators in the "
+    "last 24h. Return a score in [-1, 1] where -1 is maximally bearish, +1 "
+    "maximally bullish, 0 is neutral / mixed. Pick a SHOUTY_UPPER_CASE "
+    "dominant_emotion (BEARISH_EXPECTATION, CAUTIOUS_OPTIMISM, EUPHORIA, "
+    "FEAR, NEUTRAL, MIXED). If you can't infer with any confidence, return "
+    "0.0 with NEUTRAL and a sample_size of 0."
+)
 
-def _score(query: str) -> dict[str, Any]:
-    key = query.strip()
-    if key in STUB_SCORES:
-        return STUB_SCORES[key]
+
+def _stub(query: str) -> dict[str, Any]:
+    if query in STUB_SCORES:
+        return STUB_SCORES[query]
     return {
         "sentiment_score": 0.0,
         "sample_size": 0,
@@ -57,15 +70,26 @@ class TwitterSentiment(Specialist):
     async def handle(
         self, payload: dict[str, Any], *, trace: ReasoningTrace
     ) -> dict[str, Any]:
-        query = payload.get("query") or payload.get("ticker") or ""
-        trace.step(f"Vector-fetched against macro account corpus · query={query!r}")
-        result = _score(query)
-        trace.step(
-            f"Composite index normalised to {result['sentiment_score']:.3f}; "
-            f"dominant emotion {result['dominant_emotion']!r} over "
-            f"sample_size={result.get('sample_size', 0)}"
-        )
-        return result
+        query = str(payload.get("query") or payload.get("ticker") or "").strip()
+        if not query:
+            trace.step("Empty query — returning neutral stub")
+            return _stub("")
+
+        trace.step(f"Classifying sentiment for query={query!r}")
+        try:
+            result = llm_structured(
+                system=SYSTEM_PROMPT,
+                user={"topic": query},
+                schema=SCHEMA,
+            )
+            trace.step(
+                f"LLM emitted {result['dominant_emotion']} at "
+                f"score={result['sentiment_score']:.3f}"
+            )
+            return result
+        except LLMUnavailable as e:
+            trace.step(f"LLM unavailable ({e}); falling back to stub table")
+            return _stub(query)
 
 
 SPECIALIST = TwitterSentiment()

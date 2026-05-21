@@ -1,16 +1,18 @@
 """mandarin_macro — Chinese macroeconomic news translation specialist.
 
-Reads a PBoC release URL from the trader's payload, returns a structured
-English translation with a confidence score and the key entities mentioned.
-
-For v1 the "translation" is a deterministic stub keyed off the URL —
-swapping in an OpenAI / Anthropic call is a one-line change in `_translate`.
+Reads a PBoC release URL (or raw text) from the trader's payload and
+returns a structured English translation with a confidence score and the
+key entities mentioned. Calls OpenAI when OPENAI_API_KEY is set; falls
+back to a small deterministic stub otherwise so the demo still runs.
 """
 
 from __future__ import annotations
 
 from typing import Any
 
+import httpx
+
+from logos.llm import LLMUnavailable, llm_structured
 from logos.server import ReasoningTrace, Specialist, run
 
 SCHEMA: dict[str, Any] = {
@@ -37,17 +39,39 @@ STUB_RESPONSES = {
     },
 }
 
+SYSTEM_PROMPT = (
+    "You are a macro-finance translator specialising in Chinese central bank "
+    "and finance ministry releases. Given Mandarin source text (or a URL "
+    "pointing at one), produce a faithful, finance-literate English "
+    "translation. Mark your confidence on the [0, 1] range — be honest, "
+    "lower scores for short / ambiguous source. Extract the most important "
+    "named entities (institutions, instruments, dates, numeric levels)."
+)
 
-def _translate(url: str) -> dict[str, Any]:
+
+def _stub(url: str) -> dict[str, Any]:
     return STUB_RESPONSES.get(
         url,
         {
             "raw_text": "(no source loaded)",
-            "translated_text": "translation stub — replace _translate with a real LLM call",
+            "translated_text": "stub — set OPENAI_API_KEY to enable real translation",
             "confidence_score": 0.5,
             "key_entities": [],
         },
     )
+
+
+async def _fetch(url: str) -> str:
+    """Best-effort fetch of the source page. Returns "" on any failure;
+    the LLM can still translate from the URL alone when the site blocks
+    scraping."""
+    try:
+        async with httpx.AsyncClient(timeout=8.0, follow_redirects=True) as c:
+            r = await c.get(url, headers={"User-Agent": "logos-mandarin-macro/0.1"})
+            r.raise_for_status()
+            return r.text[:8000]  # cap so we don't blow context
+    except Exception:
+        return ""
 
 
 class MandarinMacro(Specialist):
@@ -59,18 +83,32 @@ class MandarinMacro(Specialist):
     async def handle(
         self, payload: dict[str, Any], *, trace: ReasoningTrace
     ) -> dict[str, Any]:
-        url = payload.get("text_url", "")
-        trace.step(f"Loaded source frame from {url}")
-        result = _translate(url)
-        trace.step(
-            "Mapped tokens against historical PBoC stance signals "
-            "(cross-checked '利率保持稳定' → 'rates remain stable')"
-        )
-        trace.step(
-            f"Confidence emitted at {result['confidence_score']:.3f}; "
-            f"{len(result.get('key_entities', []))} entities tagged"
-        )
-        return result
+        url = str(payload.get("text_url", ""))
+        raw = str(payload.get("raw_text", ""))
+
+        if url and not raw:
+            raw = await _fetch(url)
+            trace.step(f"Fetched {len(raw)} chars from {url}")
+        elif raw:
+            trace.step(f"Translating {len(raw)} chars of supplied text")
+        else:
+            trace.step("No source supplied — returning stub")
+            return _stub(url)
+
+        try:
+            result = llm_structured(
+                system=SYSTEM_PROMPT,
+                user={"source_url": url, "source_text": raw or url},
+                schema=SCHEMA,
+            )
+            trace.step(
+                f"LLM emitted confidence={result.get('confidence_score', 0):.3f}, "
+                f"{len(result.get('key_entities', []))} entities"
+            )
+            return result
+        except LLMUnavailable as e:
+            trace.step(f"LLM unavailable ({e}); falling back to stub")
+            return _stub(url)
 
 
 SPECIALIST = MandarinMacro()
