@@ -23,6 +23,7 @@ Boot:
 
 from __future__ import annotations
 
+import asyncio
 import os
 import sys
 from collections.abc import AsyncIterator
@@ -30,6 +31,7 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 
 # Importing each specialist module pulls in its `SPECIALIST` instance,
 # which is what FleetRunner mounts.
@@ -61,6 +63,40 @@ ALL_SPECIALISTS = [
 ]
 
 
+# Warm-up state. The anchoring loop runs in the background so the server
+# accepts connections in ~1s instead of blocking ~40s on 8 sequential
+# on-chain registrations. /healthz reports 503 until `ready` flips.
+_warmup: dict[str, Any] = {"ready": False, "anchored": 0, "total": 0, "detail": "starting"}
+
+
+async def _anchor_fleet() -> None:
+    cfg = ChainConfig.from_env()
+    if not cfg:
+        print("[fleet] no ChainConfig in env; running off-chain", flush=True)
+        _warmup.update(ready=True, detail="off-chain (no chain config)")
+        return
+    try:
+        bridge = ChainBridge(cfg, private_key=_required_env("SPECIALIST_PRIVATE_KEY"))
+        base = os.environ.get("FLEET_PUBLIC_URL", "http://localhost:8080")
+        _warmup["total"] = len(ALL_SPECIALISTS)
+        for spec in ALL_SPECIALISTS:
+            endpoint = f"{base}/specialists/{spec.name}"
+            offer_id = await _ensure_offer(bridge, spec, endpoint)
+            register_in_fleet(spec.name, bridge, offer_id)
+            _warmup["anchored"] += 1
+            _warmup["detail"] = f"anchoring {_warmup['anchored']}/{_warmup['total']}"
+            print(
+                f"[fleet] {spec.name:<24} anchored · offer_id={offer_id[:14]}… "
+                f"({_warmup['anchored']}/{_warmup['total']})",
+                flush=True,
+            )
+        print(f"[fleet] all {len(ALL_SPECIALISTS)} specialists anchored on-chain", flush=True)
+        _warmup.update(ready=True, detail="ready")
+    except Exception as e:
+        print(f"[fleet] on-chain anchor disabled ({e}); running off-chain only", flush=True)
+        _warmup.update(ready=True, detail=f"off-chain ({e})")
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     from logos.llm import is_configured as _llm_configured
@@ -71,28 +107,10 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     else:
         print("[fleet] LLM: disabled (OPENAI_API_KEY not set) — using stubs", flush=True)
 
-    cfg = ChainConfig.from_env()
-    if cfg:
-        try:
-            bridge = ChainBridge(
-                cfg,
-                private_key=_required_env("SPECIALIST_PRIVATE_KEY"),
-            )
-            base = os.environ.get("FLEET_PUBLIC_URL", "http://localhost:8080")
-            for spec in ALL_SPECIALISTS:
-                endpoint = f"{base}/specialists/{spec.name}"
-                offer_id = await _ensure_offer(bridge, spec, endpoint)
-                register_in_fleet(spec.name, bridge, offer_id)
-                print(
-                    f"[fleet] {spec.name:<24} anchored · offer_id={offer_id[:14]}…",
-                    flush=True,
-                )
-            print(f"[fleet] all {len(ALL_SPECIALISTS)} specialists anchored on-chain", flush=True)
-        except Exception as e:
-            print(f"[fleet] on-chain anchor disabled ({e}); running off-chain only", flush=True)
-    else:
-        print("[fleet] no ChainConfig in env; running off-chain", flush=True)
+    # Don't block the port on the ~40s anchoring; run it in the background.
+    task = asyncio.create_task(_anchor_fleet())
     yield
+    task.cancel()
 
 
 def _required_env(var: str) -> str:
@@ -109,6 +127,8 @@ app = FastAPI(title="logos-fleet", lifespan=lifespan)
 async def root() -> dict[str, Any]:
     return {
         "service": "logos-fleet",
+        "ready": _warmup["ready"],
+        "warmup": _warmup["detail"],
         "specialists": [
             {
                 "name": s.name,
@@ -122,8 +142,15 @@ async def root() -> dict[str, Any]:
 
 
 @app.get("/healthz")
-async def healthz() -> dict[str, Any]:
-    return {"ok": True}
+async def healthz() -> JSONResponse:
+    # 503 while the background anchoring is still running so a poke during
+    # the boot window reads as "warming up" rather than a dropped connection.
+    if not _warmup["ready"]:
+        return JSONResponse(
+            {"status": "warming_up", "detail": _warmup["detail"]},
+            status_code=503,
+        )
+    return JSONResponse({"status": "ok", "detail": _warmup["detail"]})
 
 
 # Mount each specialist as an independent ASGI sub-app. Their own /health,
