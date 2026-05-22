@@ -5,6 +5,7 @@ import { initStore } from "./store.js";
 import type {
   AgentTransaction,
   CompositionTrace,
+  MarketOffer,
   MarketplaceSummary,
   SpecialistAgent,
 } from "./types.js";
@@ -85,5 +86,41 @@ describe("REST routes", () => {
       const curr = list[i]?.metrics.queriesServed ?? 0;
       expect(prev).toBeGreaterThanOrEqual(curr);
     }
+  });
+
+  it("GET /api/offers returns offers ranked by reputation, tiebroken by price", async () => {
+    const offers = await getJson<MarketOffer[]>("/api/offers");
+    expect(offers.length).toBe(8);
+    for (const o of offers) {
+      expect(o.endpointUrl).toMatch(/\/specialists\//);
+      expect(o.agentId).toMatch(/^0x[0-9a-f]{64}$/);
+      expect(o.pricePerQueryUsdc).toBeGreaterThan(0);
+    }
+    // reputation desc, then price asc
+    for (let i = 1; i < offers.length; i += 1) {
+      const prev = offers[i - 1]!;
+      const curr = offers[i]!;
+      if (prev.reputation === curr.reputation) {
+        expect(prev.pricePerQueryUsdc).toBeLessThanOrEqual(curr.pricePerQueryUsdc);
+      } else {
+        expect(prev.reputation).toBeGreaterThan(curr.reputation);
+      }
+    }
+  });
+
+  it("GET /api/offers?service_type=X filters to that service", async () => {
+    const offers = await getJson<MarketOffer[]>(
+      "/api/offers?service_type=translation",
+    );
+    expect(offers.length).toBeGreaterThan(0);
+    for (const o of offers) expect(o.serviceType).toBe("translation");
+  });
+
+  it("GET /api/offers?max_price=Y filters out pricier offers", async () => {
+    const cap = 0.0001;
+    const offers = await getJson<MarketOffer[]>(
+      `/api/offers?max_price=${cap}`,
+    );
+    for (const o of offers) expect(o.pricePerQueryUsdc).toBeLessThanOrEqual(cap);
   });
 });

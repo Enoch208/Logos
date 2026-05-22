@@ -55,6 +55,16 @@ export interface MarketplaceSummary {
   externalAgentsIntegrated: number;
 }
 
+export interface MarketOffer {
+  specialist: string;
+  agentId: string;
+  serviceType: string;
+  pricePerQueryUsdc: number;
+  reputation: number; // 0.00–10.00, live from chain when available
+  endpointUrl: string;
+  active: boolean;
+}
+
 export type WsMessage =
   | { type: "tx"; payload: AgentTransaction }
   | { type: "summary"; payload: MarketplaceSummary }

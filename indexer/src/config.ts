@@ -23,6 +23,10 @@ export const config = {
   },
   ipfsGateway: process.env.IPFS_GATEWAY ?? "https://w3s.link/ipfs",
   allowedOrigins: csv(process.env.ALLOWED_ORIGINS ?? "http://localhost:3000"),
+  // Where the specialist fleet is reachable, used to construct offer
+  // endpoint URLs for discovery. Mirrors the fleet's mount layout
+  // (<base>/specialists/<name>).
+  fleetPublicUrl: process.env.FLEET_PUBLIC_URL ?? "http://localhost:8080",
 };
 
 export const chainReady =

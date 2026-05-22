@@ -5,6 +5,7 @@ import {
   getSpecialists,
   getSummary,
 } from "./store.js";
+import { getMarketOffers } from "./offers.js";
 
 export const api = new Hono();
 
@@ -23,6 +24,16 @@ api.get("/transactions", async (c) => {
 });
 
 api.get("/atlas", (c) => c.json(getAtlas()));
+
+// FR-2 discovery: matching offers ranked by reputation, tiebroken by price.
+//   GET /api/offers?service_type=translation&max_price=0.0002
+api.get("/offers", async (c) => {
+  const serviceType = c.req.query("service_type") || undefined;
+  const maxPriceRaw = c.req.query("max_price");
+  const maxPriceUsdc = maxPriceRaw ? Number(maxPriceRaw) : undefined;
+  const offers = await getMarketOffers({ serviceType, maxPriceUsdc });
+  return c.json(offers);
+});
 
 api.get("/leaderboard", (c) => {
   const metric = c.req.query("metric") ?? "earned";

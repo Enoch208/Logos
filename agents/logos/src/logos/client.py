@@ -33,7 +33,7 @@ from __future__ import annotations
 
 import os
 import secrets
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 import httpx
@@ -51,7 +51,8 @@ class QueryFailed(Exception):
 
 @dataclass
 class LogosClient:
-    specialist_directory: dict[str, str]
+    specialist_directory: dict[str, str] = field(default_factory=dict)
+    discovery_url: str | None = None  # indexer base URL for FR-2 discovery
     wallet_private_key: str | None = None
     chain_id: int | None = None
     marketplace_address: str | None = None
@@ -64,6 +65,39 @@ class LogosClient:
         self.marketplace_address = self.marketplace_address or os.environ.get(
             "MARKETPLACE_ADDRESS", "0x" + "0" * 40
         )
+        self.discovery_url = self.discovery_url or os.environ.get("LOGOS_DISCOVERY_URL")
+
+    async def discover(
+        self, service_type: str, max_price_usdc: float | None = None
+    ) -> list[dict[str, Any]]:
+        """FR-2: ask Logos for matching offers ranked by reputation,
+        tiebroken by price. Returns the ranked list (best first)."""
+        if not self.discovery_url:
+            return []
+        params = {"service_type": service_type}
+        if max_price_usdc is not None:
+            params["max_price"] = str(max_price_usdc)
+        async with httpx.AsyncClient(timeout=self.timeout) as http:
+            resp = await http.get(f"{self.discovery_url}/api/offers", params=params)
+            resp.raise_for_status()
+            data = resp.json()
+        return data if isinstance(data, list) else []
+
+    async def _resolve_endpoint(
+        self, service_type: str, max_price_usdc: float | None
+    ) -> str:
+        """Explicit directory wins; otherwise discover the best offer."""
+        endpoint = self.specialist_directory.get(service_type)
+        if endpoint:
+            return endpoint
+        offers = await self.discover(service_type, max_price_usdc)
+        if offers:
+            best = offers[0]
+            return str(best["endpointUrl"])
+        raise QueryFailed(
+            f"no specialist for service_type={service_type!r} "
+            f"(empty directory and discovery returned nothing)"
+        )
 
     async def query(
         self,
@@ -74,9 +108,7 @@ class LogosClient:
         verify_signer: str | None = None,
         rating: int | None = None,
     ) -> AttestedResponse:
-        endpoint = self.specialist_directory.get(service_type)
-        if not endpoint:
-            raise QueryFailed(f"no specialist registered for service_type={service_type!r}")
+        endpoint = await self._resolve_endpoint(service_type, max_price_usdc)
 
         async with httpx.AsyncClient(timeout=self.timeout) as http:
             # Round 1 — expect HTTP 402 with payment instructions
