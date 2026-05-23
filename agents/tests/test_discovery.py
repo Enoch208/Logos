@@ -74,3 +74,61 @@ def test_discovery_url_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("LOGOS_DISCOVERY_URL", "http://from-env")
     client = LogosClient()
     assert client.discovery_url == "http://from-env"
+
+
+# --- trace-CID reporting (so the live feed links to a resolvable trace) ---
+
+
+def _post_client() -> MagicMock:
+    resp = MagicMock()
+    resp.raise_for_status = MagicMock()
+    http = MagicMock()
+    http.post = AsyncMock(return_value=resp)
+    return http
+
+
+async def test_report_trace_cid_posts_query_and_cid() -> None:
+    client = LogosClient(discovery_url="http://indexer")
+    http = _post_client()
+    qid = "0x" + "ab" * 32
+    await client._report_trace_cid(http, qid, "bafyrealcid")
+    http.post.assert_awaited_once()
+    args, kwargs = http.post.call_args
+    assert args[0] == "http://indexer/api/ingest/trace"
+    assert kwargs["json"] == {"queryId": qid, "traceCid": "bafyrealcid"}
+
+
+async def test_report_trace_cid_skips_without_discovery_url(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("LOGOS_DISCOVERY_URL", raising=False)
+    client = LogosClient()
+    http = _post_client()
+    await client._report_trace_cid(http, "0x" + "ab" * 32, "bafyrealcid")
+    http.post.assert_not_awaited()
+
+
+async def test_report_trace_cid_skips_dev_stub() -> None:
+    client = LogosClient(discovery_url="http://indexer")
+    http = _post_client()
+    await client._report_trace_cid(http, "0x" + "ab" * 32, "dev:deadbeef")
+    http.post.assert_not_awaited()
+
+
+async def test_report_trace_cid_swallows_errors() -> None:
+    client = LogosClient(discovery_url="http://indexer")
+    http = MagicMock()
+    http.post = AsyncMock(side_effect=RuntimeError("indexer down"))
+    # Must not raise — a reporting failure can't be allowed to sink the query.
+    await client._report_trace_cid(http, "0x" + "ab" * 32, "bafyrealcid")
+
+
+async def test_report_trace_cid_sends_secret_when_set(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("LOGOS_INGEST_SECRET", "s3cret")
+    client = LogosClient(discovery_url="http://indexer")
+    http = _post_client()
+    await client._report_trace_cid(http, "0x" + "ab" * 32, "bafyrealcid")
+    _args, kwargs = http.post.call_args
+    assert kwargs["headers"]["Authorization"] == "Bearer s3cret"

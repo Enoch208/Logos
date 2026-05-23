@@ -188,7 +188,35 @@ class LogosClient:
                     # and move on. A future revision can surface this.
                     print(f"[client] on-chain rate failed: {e}")
 
+            await self._report_trace_cid(http, response.query_id, response.trace_cid)
+
             return response
+
+    async def _report_trace_cid(
+        self, http: httpx.AsyncClient, query_id: str, trace_cid: str
+    ) -> None:
+        """Hand the indexer the real IPFS CID for this query (best-effort).
+
+        The chain anchors only the keccak hash of the trace, so without this
+        the live feed shows that anchor instead of a resolvable CID. Reporting
+        must never sink the query, so failures are swallowed. `dev:` stubs
+        aren't worth reporting — they don't resolve on IPFS either.
+        """
+        if not self.discovery_url or not trace_cid or trace_cid.startswith("dev:"):
+            return
+        headers: dict[str, str] = {}
+        secret = os.environ.get("LOGOS_INGEST_SECRET")
+        if secret:
+            headers["Authorization"] = f"Bearer {secret}"
+        try:
+            await http.post(
+                f"{self.discovery_url}/api/ingest/trace",
+                json={"queryId": query_id, "traceCid": trace_cid},
+                headers=headers,
+                timeout=3.0,
+            )
+        except Exception:
+            pass
 
     async def _discover_offer_id(self, http: httpx.AsyncClient, endpoint: str) -> str | None:
         try:
