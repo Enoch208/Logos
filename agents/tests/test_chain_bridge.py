@@ -75,6 +75,7 @@ def bridge(cfg: ChainConfig, monkeypatch: pytest.MonkeyPatch) -> ChainBridge:
         attestResponse=lambda *a, **kw: fn,
         rate=lambda *a, **kw: fn,
         register=lambda *a, **kw: fn,
+        deactivateOffer=lambda *a, **kw: fn,
     )
     b.marketplace = SimpleNamespace(functions=fns, events=SimpleNamespace())
     b.registry = SimpleNamespace(functions=fns)
@@ -128,6 +129,11 @@ def test_rate_accepts_valid_score(bridge: ChainBridge) -> None:
     for good in (1, 3, 5):
         tx = bridge.rate("0x" + "01" * 32, good)
         assert tx == "0x" + "11" * 32
+
+
+def test_deactivate_offer_returns_tx_hash(bridge: ChainBridge) -> None:
+    tx = bridge.deactivate_offer("0x" + "01" * 32)
+    assert tx == "0x" + "11" * 32
 
 
 def test_chain_config_from_env_returns_none_when_missing(

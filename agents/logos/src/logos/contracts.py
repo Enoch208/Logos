@@ -72,6 +72,13 @@ MARKETPLACE_ABI: list[dict[str, Any]] = [
         "outputs": [],
     },
     {
+        "type": "function",
+        "name": "deactivateOffer",
+        "stateMutability": "nonpayable",
+        "inputs": [{"name": "offerId", "type": "bytes32"}],
+        "outputs": [],
+    },
+    {
         "type": "event",
         "name": "QueryRecorded",
         "anonymous": False,
@@ -242,6 +249,14 @@ class ChainBridge:
             raise ValueError(f"score must be 1..5, got {score}")
         return self._send(
             self.marketplace.functions.rate(_to_bytes32(query_id), int(score))
+        )
+
+    def deactivate_offer(self, offer_id: str) -> str:
+        """Owner-gated: flips an offer inactive so it drops out of discovery.
+        Used by the health monitor to auto-deactivate a specialist that has
+        failed N consecutive liveness checks (FR-10)."""
+        return self._send(
+            self.marketplace.functions.deactivateOffer(_to_bytes32(offer_id))
         )
 
     # ─── internal ────────────────────────────────────────────────────────
