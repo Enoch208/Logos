@@ -239,8 +239,13 @@ class LogosClient:
                 raise QueryFailed(
                     "SETTLEMENT_MODE=real but no trader signing key available"
                 )
+            valid_secs = int(os.environ.get("SETTLEMENT_VALIDITY_SECS", "300"))
             auth = sign_receive_authorization(
-                key, to=recipient, value=int(price), chain_id=self.chain_id or 0
+                key,
+                to=recipient,
+                value=int(price),
+                chain_id=self.chain_id or 0,
+                valid_secs=valid_secs,
             )
             return encode_header(auth)
 
