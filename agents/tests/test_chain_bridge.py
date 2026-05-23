@@ -76,9 +76,11 @@ def bridge(cfg: ChainConfig, monkeypatch: pytest.MonkeyPatch) -> ChainBridge:
         rate=lambda *a, **kw: fn,
         register=lambda *a, **kw: fn,
         deactivateOffer=lambda *a, **kw: fn,
+        receiveWithAuthorization=lambda *a, **kw: fn,
     )
     b.marketplace = SimpleNamespace(functions=fns, events=SimpleNamespace())
     b.registry = SimpleNamespace(functions=fns)
+    b.usdc = SimpleNamespace(functions=fns)
     return b
 
 
@@ -133,6 +135,22 @@ def test_rate_accepts_valid_score(bridge: ChainBridge) -> None:
 
 def test_deactivate_offer_returns_tx_hash(bridge: ChainBridge) -> None:
     tx = bridge.deactivate_offer("0x" + "01" * 32)
+    assert tx == "0x" + "11" * 32
+
+
+def test_submit_receive_with_authorization_returns_tx_hash(bridge: ChainBridge) -> None:
+    auth = {
+        "from": "0x" + "11" * 20,
+        "to": "0x" + "22" * 20,
+        "value": 150,
+        "validAfter": 0,
+        "validBefore": 9999999999,
+        "nonce": "0x" + "ab" * 32,
+        "v": 27,
+        "r": "0x" + "01" * 32,
+        "s": "0x" + "02" * 32,
+    }
+    tx = bridge.submit_receive_with_authorization(auth)
     assert tx == "0x" + "11" * 32
 
 

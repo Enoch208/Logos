@@ -116,6 +116,33 @@ REGISTRY_ABI: list[dict[str, Any]] = [
     },
 ]
 
+USDC_ABI: list[dict[str, Any]] = [
+    {
+        "type": "function",
+        "name": "receiveWithAuthorization",
+        "stateMutability": "nonpayable",
+        "inputs": [
+            {"name": "from", "type": "address"},
+            {"name": "to", "type": "address"},
+            {"name": "value", "type": "uint256"},
+            {"name": "validAfter", "type": "uint256"},
+            {"name": "validBefore", "type": "uint256"},
+            {"name": "nonce", "type": "bytes32"},
+            {"name": "v", "type": "uint8"},
+            {"name": "r", "type": "bytes32"},
+            {"name": "s", "type": "bytes32"},
+        ],
+        "outputs": [],
+    },
+    {
+        "type": "function",
+        "name": "balanceOf",
+        "stateMutability": "view",
+        "inputs": [{"name": "account", "type": "address"}],
+        "outputs": [{"name": "", "type": "uint256"}],
+    },
+]
+
 
 @dataclass(frozen=True)
 class ChainConfig:
@@ -123,6 +150,7 @@ class ChainConfig:
     chain_id: int
     marketplace: str
     registry: str
+    usdc: str = "0x3600000000000000000000000000000000000000"
 
     @classmethod
     def from_env(cls) -> "ChainConfig | None":
@@ -135,6 +163,9 @@ class ChainConfig:
                 chain_id=int(os.environ["ARC_CHAIN_ID"]),
                 marketplace=os.environ["MARKETPLACE_ADDRESS"],
                 registry=os.environ["AGENT_REGISTRY_ADDRESS"],
+                usdc=os.environ.get(
+                    "USDC_ADDRESS", "0x3600000000000000000000000000000000000000"
+                ),
             )
         except KeyError:
             return None
@@ -184,6 +215,10 @@ class ChainBridge:
         self.registry: Contract = self.w3.eth.contract(
             address=Web3.to_checksum_address(cfg.registry),
             abi=REGISTRY_ABI,
+        )
+        self.usdc: Contract = self.w3.eth.contract(
+            address=Web3.to_checksum_address(cfg.usdc),
+            abi=USDC_ABI,
         )
 
     # ─── writes ──────────────────────────────────────────────────────────
@@ -257,6 +292,29 @@ class ChainBridge:
         failed N consecutive liveness checks (FR-10)."""
         return self._send(
             self.marketplace.functions.deactivateOffer(_to_bytes32(offer_id))
+        )
+
+    def submit_receive_with_authorization(self, auth: dict[str, Any]) -> str:
+        """Submits a trader-signed EIP-3009 ReceiveWithAuthorization, moving
+        real USDC from `auth['from']` to `auth['to']`. msg.sender (this hot
+        key) must equal `auth['to']` — i.e. the specialist is the payee."""
+        return self._send(
+            self.usdc.functions.receiveWithAuthorization(
+                Web3.to_checksum_address(auth["from"]),
+                Web3.to_checksum_address(auth["to"]),
+                int(auth["value"]),
+                int(auth["validAfter"]),
+                int(auth["validBefore"]),
+                _to_bytes32(auth["nonce"]),
+                int(auth["v"]),
+                _to_bytes32(auth["r"]),
+                _to_bytes32(auth["s"]),
+            )
+        )
+
+    def usdc_balance_of(self, address: str) -> int:
+        return int(
+            self.usdc.functions.balanceOf(Web3.to_checksum_address(address)).call()
         )
 
     # ─── internal ────────────────────────────────────────────────────────
