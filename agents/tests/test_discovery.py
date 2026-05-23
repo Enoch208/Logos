@@ -132,3 +132,48 @@ async def test_report_trace_cid_sends_secret_when_set(
     await client._report_trace_cid(http, "0x" + "ab" * 32, "bafyrealcid")
     _args, kwargs = http.post.call_args
     assert kwargs["headers"]["Authorization"] == "Bearer s3cret"
+
+
+# --- payment auth: simulated token vs real EIP-3009 authorization ---
+
+
+def test_make_payment_auth_simulated_is_keccak_token(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SETTLEMENT_MODE", "simulated")
+    client = LogosClient()
+    tok = client._make_payment_auth(
+        price=150, recipient="0x" + "22" * 20, query_id="0x" + "01" * 32
+    )
+    assert tok.startswith("0x") and len(tok) == 66
+
+
+def test_make_payment_auth_real_is_signed_authorization(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from eth_account import Account
+
+    from logos.contracts import ChainBridge, ChainConfig
+    from logos.settlement import decode_header, verify_authorization
+
+    monkeypatch.setenv("SETTLEMENT_MODE", "real")
+    trader = Account.create()
+    payee = Account.create()
+
+    # ChainBridge whose account is the trader; no network (make_web3 mocked).
+    cfg = ChainConfig(
+        rpc_url="http://t", chain_id=5042002,
+        marketplace="0x" + "ab" * 20, registry="0x" + "cd" * 20,
+    )
+    monkeypatch.setattr("logos.contracts.make_web3", lambda _c: MagicMock())
+    bridge = ChainBridge(cfg, private_key=trader.key.hex())
+    client = LogosClient(chain_bridge=bridge, chain_id=5042002)
+
+    header = client._make_payment_auth(
+        price=150, recipient=payee.address, query_id="0x" + "01" * 32
+    )
+    auth = decode_header(header)
+    recovered = verify_authorization(
+        auth, expected_payee=payee.address, min_value=150, chain_id=5042002
+    )
+    assert recovered.lower() == trader.address.lower()

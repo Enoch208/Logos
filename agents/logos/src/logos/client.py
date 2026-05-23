@@ -227,10 +227,25 @@ class LogosClient:
             return None
 
     def _make_payment_auth(self, *, price: int, recipient: str, query_id: str) -> str:
-        # Opaque token the specialist echoes back. The real x402 / Circle
-        # Gateway path replaces this with an EIP-3009 authorization signed
-        # over (USDC, recipient, price, nonce). We anchor its keccak on
-        # chain so reputation accountability still works.
+        if os.environ.get("SETTLEMENT_MODE", "simulated") == "real":
+            from .settlement import encode_header, sign_receive_authorization
+
+            key = (
+                self.chain_bridge.account.key
+                if self.chain_bridge
+                else self.wallet_private_key
+            )
+            if not key:
+                raise QueryFailed(
+                    "SETTLEMENT_MODE=real but no trader signing key available"
+                )
+            auth = sign_receive_authorization(
+                key, to=recipient, value=int(price), chain_id=self.chain_id or 0
+            )
+            return encode_header(auth)
+
+        # Simulated: opaque token the specialist echoes back. We anchor its
+        # keccak on chain so reputation accountability still works.
         nonce = "0x" + secrets.token_hex(16)
         return keccak_hex(
             {
