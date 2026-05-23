@@ -11,7 +11,8 @@ import pytest
 from eth_account import Account
 
 from logos.canonical import keccak_hex
-from logos.server import ReasoningTrace, Specialist, build_app
+from logos.server import FLEET_REGISTRY, ReasoningTrace, Specialist, build_app, register_in_fleet
+from logos.settlement import encode_header, sign_receive_authorization
 from logos.signing import verify_attestation
 
 
@@ -97,6 +98,71 @@ async def test_run_second_pass_returns_attested_response(env: Account) -> None:
             response_hash=body["response_hash"],
             trace_cid=body["trace_anchor"],
         )
+
+
+class _FakeBridge:
+    def __init__(self) -> None:
+        self.submitted: list = []
+
+    def submit_receive_with_authorization(self, auth):
+        self.submitted.append(auth)
+        return "0x" + "fe" * 32
+
+    def attest_response(self, **kwargs):
+        return "0x" + "ad" * 32
+
+
+async def test_real_mode_settles_then_serves(
+    monkeypatch: pytest.MonkeyPatch, env: Account
+) -> None:
+    monkeypatch.setenv("SETTLEMENT_MODE", "real")
+    monkeypatch.setenv("ARC_CHAIN_ID", "5042002")
+    spec = EchoSpecialist()
+    fake = _FakeBridge()
+    register_in_fleet(spec.name, fake, "0x" + "01" * 32)
+    try:
+        async with await _httpx_app(spec) as http:
+            probe = await http.post("/run", json={"msg": "hi"})
+            query_id = probe.headers["x-402-query-id"]
+            payee = probe.headers["x-402-recipient"]
+            trader = Account.create()
+            auth = sign_receive_authorization(
+                trader.key, to=payee, value=spec.price_per_query_usdc_6, chain_id=5042002
+            )
+            paid = await http.post(
+                "/run",
+                json={"msg": "hi"},
+                headers={"X-Payment-Auth": encode_header(auth), "X-402-Query-Id": query_id},
+            )
+            assert paid.status_code == 200
+            assert paid.json()["settlement_tx"] == "0x" + "fe" * 32
+            assert len(fake.submitted) == 1
+    finally:
+        FLEET_REGISTRY.pop(spec.name, None)
+
+
+async def test_real_mode_bad_auth_returns_402_without_serving(
+    monkeypatch: pytest.MonkeyPatch, env: Account
+) -> None:
+    monkeypatch.setenv("SETTLEMENT_MODE", "real")
+    monkeypatch.setenv("ARC_CHAIN_ID", "5042002")
+    spec = EchoSpecialist()
+    fake = _FakeBridge()
+    register_in_fleet(spec.name, fake, "0x" + "01" * 32)
+    try:
+        async with await _httpx_app(spec) as http:
+            probe = await http.post("/run", json={"msg": "hi"})
+            query_id = probe.headers["x-402-query-id"]
+            paid = await http.post(
+                "/run",
+                json={"msg": "hi"},
+                headers={"X-Payment-Auth": "not-a-valid-header", "X-402-Query-Id": query_id},
+            )
+            assert paid.status_code == 402
+            assert "payload" not in paid.json()
+            assert fake.submitted == []
+    finally:
+        FLEET_REGISTRY.pop(spec.name, None)
 
 
 async def test_schema_violation_returns_500() -> None:

@@ -180,9 +180,13 @@ def build_app(specialist: Specialist) -> FastAPI:
 
         payload = await request.json()
         headers = {k: v for k, v in request.headers.items()}
-        payment = extract_payment_header(headers)
+        settlement_mode = os.environ.get("SETTLEMENT_MODE", "simulated")
+        # Case-preserved: a base64 EIP-3009 blob in real mode, a hex token in
+        # simulated mode. extract_payment_header lower-cases, so don't route the
+        # base64 through it.
+        payment_raw = headers.get("x-payment-auth")
 
-        if not payment:
+        if not payment_raw:
             required = PaymentRequired(
                 price_usdc_6=specialist.price_per_query_usdc_6,
                 recipient=recipient,
@@ -199,6 +203,40 @@ def build_app(specialist: Specialist) -> FastAPI:
             )
 
         query_id = headers.get("x-402-query-id") or "0x" + secrets.token_hex(32)
+
+        # Real settlement (pay-before-serve): verify the EIP-3009 authorization
+        # and pull real USDC on-chain before doing any work. Any failure → 402.
+        settlement_tx: str | None = None
+        if settlement_mode == "real":
+            from .settlement import USDC_ADDRESS, decode_header, verify_authorization
+
+            bridge_settle, _ = _live_state()
+            if bridge_settle is None:
+                return Response(
+                    status_code=402,
+                    content=canonical_dumps({"reason": "settlement unavailable: no chain bridge"}),
+                    media_type="application/json",
+                )
+            try:
+                auth = decode_header(payment_raw)
+                verify_authorization(
+                    auth,
+                    expected_payee=recipient,
+                    min_value=specialist.price_per_query_usdc_6,
+                    chain_id=chain_id,
+                    usdc=USDC_ADDRESS,
+                )
+                settlement_tx = bridge_settle.submit_receive_with_authorization(auth)
+            except Exception as e:
+                return Response(
+                    status_code=402,
+                    content=canonical_dumps({"reason": f"settlement failed: {e}"}),
+                    media_type="application/json",
+                )
+            payment_auth_hash = keccak_hex(auth)
+        else:
+            payment_auth_hash = keccak_hex({"auth": extract_payment_header(headers)})
+
         trace = ReasoningTrace(metadata={"specialist": specialist.name, "query_id": query_id})
 
         try:
@@ -243,7 +281,8 @@ def build_app(specialist: Specialist) -> FastAPI:
                 "trace_anchor": trace_anchor,
                 "response_hash": response_hash,
                 "signature": signature,
-                "payment_auth_hash": keccak_hex({"auth": payment}),
+                "payment_auth_hash": payment_auth_hash,
+                "settlement_tx": settlement_tx,
                 "attest_tx": attest_tx,
             }
         )
