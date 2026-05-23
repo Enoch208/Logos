@@ -33,8 +33,29 @@ class MemoryStore {
 
 const memory = new MemoryStore();
 
+// The chain anchors only the keccak canonical-trace hash (bytes32). The real
+// IPFS CID is reported off-chain by the trader after it reads the attestation
+// (POST /api/ingest/trace). We join it onto transactions by query id so the
+// live feed links to a resolvable trace instead of the raw on-chain anchor.
+const traceCidByQuery = new Map<string, string>();
+
 let mongoClient: MongoClient | undefined;
 let txCollection: Collection<AgentTransaction> | undefined;
+
+export function setTraceCid(queryId: string, cid: string): void {
+  const key = queryId.toLowerCase();
+  traceCidByQuery.set(key, cid);
+  for (const t of memory.state.transactions) {
+    if (t.id.toLowerCase() === key) t.traceCid = cid;
+  }
+  txCollection
+    ?.updateMany({ id: queryId }, { $set: { traceCid: cid } })
+    .catch((err) => console.warn("[store] traceCid update failed:", err));
+}
+
+export function resolveTraceCid(queryId: string, fallback: string): string {
+  return traceCidByQuery.get(queryId.toLowerCase()) ?? fallback;
+}
 
 export async function initStore(): Promise<{ kind: "mongo" | "memory" }> {
   if (!config.mongoUri) return { kind: "memory" };
@@ -71,10 +92,15 @@ export function getAtlas(): CompositionTrace {
 }
 
 export async function getRecentTransactions(limit = 30): Promise<AgentTransaction[]> {
-  if (txCollection) {
-    return txCollection.find().sort({ timestamp: -1 }).limit(limit).toArray();
-  }
-  return memory.state.transactions.slice(0, limit);
+  const rows = txCollection
+    ? await txCollection.find().sort({ timestamp: -1 }).limit(limit).toArray()
+    : memory.state.transactions.slice(0, limit);
+  // Late-arriving CID reports may post after a row was stored, so resolve at
+  // read time too — the override map is authoritative regardless of ordering.
+  return rows.map((t) => {
+    const cid = traceCidByQuery.get(t.id.toLowerCase());
+    return cid && cid !== t.traceCid ? { ...t, traceCid: cid } : t;
+  });
 }
 
 export async function recordTransaction(tx: AgentTransaction): Promise<void> {

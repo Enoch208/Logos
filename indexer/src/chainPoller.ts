@@ -8,7 +8,7 @@ import {
   stringToBytes,
 } from "viem";
 import { config } from "./config.js";
-import { recordTransaction } from "./store.js";
+import { recordTransaction, resolveTraceCid } from "./store.js";
 import { SEED_SPECIALISTS } from "./seed.js";
 import type { AgentTransaction, QueryStatus } from "./types.js";
 
@@ -233,7 +233,7 @@ export function startChainPoller(
         costUsdc: Number(formatUnits(q.pricePerQuery, 6)),
         status,
         ...(rating !== undefined ? { rating } : {}),
-        traceCid: bytes32ToCid(q.traceCID),
+        traceCid: resolveTraceCid(queryId, bytes32ToCid(q.traceCID)),
       };
       console.log(
         `[chainPoller] ${status} ${queryId.slice(0, 14)}… ${specialistId}`,

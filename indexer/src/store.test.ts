@@ -6,6 +6,8 @@ import {
   getSummary,
   initStore,
   recordTransaction,
+  resolveTraceCid,
+  setTraceCid,
 } from "./store.js";
 import type { AgentTransaction } from "./types.js";
 
@@ -88,5 +90,30 @@ describe("store", () => {
     }
     const three = await getRecentTransactions(3);
     expect(three.length).toBe(3);
+  });
+
+  it("setTraceCid overrides the on-chain anchor for matching query rows", async () => {
+    const qid = "0xqueryWithRealCid";
+    await recordTransaction(tx({ id: qid, status: "ESCROWED", traceCid: "0xanchor" }));
+    await recordTransaction(tx({ id: qid, status: "RATED", traceCid: "0xanchor" }));
+
+    setTraceCid(qid, "bafyrealcid");
+
+    const rows = (await getRecentTransactions(200)).filter((t) => t.id === qid);
+    expect(rows).toHaveLength(2);
+    for (const row of rows) expect(row.traceCid).toBe("bafyrealcid");
+  });
+
+  it("setTraceCid applies to rows recorded after the report (late chain events)", async () => {
+    const qid = "0xlateQuery";
+    setTraceCid(qid, "bafylatecid");
+    await recordTransaction(tx({ id: qid, status: "ATTESTED", traceCid: "0xanchor" }));
+
+    const row = (await getRecentTransactions(200)).find((t) => t.id === qid);
+    expect(row?.traceCid).toBe("bafylatecid");
+  });
+
+  it("resolveTraceCid falls back to the anchor when no CID was reported", () => {
+    expect(resolveTraceCid("0xneverReported", "0xanchor")).toBe("0xanchor");
   });
 });

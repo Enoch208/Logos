@@ -4,6 +4,7 @@ import {
   getRecentTransactions,
   getSpecialists,
   getSummary,
+  setTraceCid,
 } from "./store.js";
 import { getMarketOffers } from "./offers.js";
 import { config } from "./config.js";
@@ -66,6 +67,31 @@ api.get("/trace/:cid", async (c) => {
       502,
     );
   }
+});
+
+// Off-chain trace-CID ingest. The chain anchors only the keccak hash of a
+// trace, so the trader reports the real IPFS CID it received here, joined to
+// the on-chain query by id — making the live feed link to resolvable traces.
+//   POST /api/ingest/trace  { queryId, traceCid }
+api.post("/ingest/trace", async (c) => {
+  if (config.ingestSecret) {
+    if (c.req.header("authorization") !== `Bearer ${config.ingestSecret}`) {
+      return c.json({ error: "unauthorized" }, 401);
+    }
+  }
+  const body = (await c.req.json().catch(() => null)) as
+    | { queryId?: unknown; traceCid?: unknown }
+    | null;
+  const queryId = body?.queryId;
+  const traceCid = body?.traceCid;
+  if (typeof queryId !== "string" || !/^0x[0-9a-fA-F]{64}$/.test(queryId)) {
+    return c.json({ error: "bad_query_id" }, 400);
+  }
+  if (typeof traceCid !== "string" || traceCid.length < 8 || traceCid.startsWith("0x")) {
+    return c.json({ error: "bad_trace_cid" }, 400);
+  }
+  setTraceCid(queryId, traceCid);
+  return c.json({ ok: true });
 });
 
 api.get("/leaderboard", (c) => {

@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { Hono } from "hono";
 import { api } from "./routes.js";
-import { initStore } from "./store.js";
+import { initStore, recordTransaction } from "./store.js";
 import type {
   AgentTransaction,
   CompositionTrace,
@@ -122,5 +122,50 @@ describe("REST routes", () => {
       `/api/offers?max_price=${cap}`,
     );
     for (const o of offers) expect(o.pricePerQueryUsdc).toBeLessThanOrEqual(cap);
+  });
+
+  it("POST /api/ingest/trace attaches a real CID to the query's rows", async () => {
+    const qid = "0x" + "cd".repeat(32);
+    await recordTransaction({
+      id: qid,
+      timestamp: new Date().toISOString(),
+      traderId: "0xtrader",
+      specialistId: "0xspec (mandarin_macro)",
+      serviceType: "translation",
+      costUsdc: 0.00015,
+      status: "RATED",
+      traceCid: "0xanchor",
+    });
+    const res = await app.request("/api/ingest/trace", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ queryId: qid, traceCid: "bafyfromtrader" }),
+    });
+    expect(res.status).toBe(200);
+
+    const txns = await getJson<AgentTransaction[]>("/api/transactions?limit=200");
+    const row = txns.find((t) => t.id === qid);
+    expect(row?.traceCid).toBe("bafyfromtrader");
+  });
+
+  it("POST /api/ingest/trace rejects a malformed query id", async () => {
+    const res = await app.request("/api/ingest/trace", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ queryId: "0xnope", traceCid: "bafyrealcid" }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("POST /api/ingest/trace rejects a hash masquerading as a CID", async () => {
+    const res = await app.request("/api/ingest/trace", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        queryId: "0x" + "ab".repeat(32),
+        traceCid: "0xdeadbeef",
+      }),
+    });
+    expect(res.status).toBe(400);
   });
 });

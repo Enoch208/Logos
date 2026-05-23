@@ -27,6 +27,9 @@ export const config = {
   // endpoint URLs for discovery. Mirrors the fleet's mount layout
   // (<base>/specialists/<name>).
   fleetPublicUrl: process.env.FLEET_PUBLIC_URL ?? "http://localhost:8080",
+  // Optional shared secret gating the trace-CID ingest endpoint. Unset = open,
+  // which is fine for local dev or a single-tenant demo box.
+  ingestSecret: process.env.INGEST_SECRET ?? "",
 };
 
 export const chainReady =
