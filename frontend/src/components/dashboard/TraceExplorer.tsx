@@ -8,6 +8,7 @@ import {
   ArrowRight01Icon,
 } from "hugeicons-react";
 import { ATLAS_FLAGSHIP_TRACE } from "@/data/mockData";
+import { API_BASE } from "@/lib/api";
 import { SectionHeading } from "@/components/dashboard/SectionHeading";
 import { JsonBlock } from "@/components/dashboard/JsonBlock";
 
@@ -15,6 +16,7 @@ type State =
   | { kind: "idle" }
   | { kind: "loading" }
   | { kind: "ok"; cid: string; step: (typeof ATLAS_FLAGSHIP_TRACE.steps)[number] }
+  | { kind: "live"; cid: string; trace: object }
   | { kind: "miss"; cid: string };
 
 const KNOWN: Record<string, (typeof ATLAS_FLAGSHIP_TRACE.steps)[number]> = {};
@@ -26,14 +28,32 @@ export function TraceExplorer() {
   const [value, setValue] = useState("");
   const [state, setState] = useState<State>({ kind: "idle" });
 
-  function resolve(raw: string) {
+  async function resolve(raw: string) {
     const cid = raw.replace(/^ipfs:\/\//, "").trim();
     if (!cid) return;
     setState({ kind: "loading" });
-    setTimeout(() => {
-      const hit = KNOWN[cid];
-      setState(hit ? { kind: "ok", cid, step: hit } : { kind: "miss", cid });
-    }, 420);
+
+    // Seed traces resolve instantly with their on-chain-verified shape.
+    const hit = KNOWN[cid];
+    if (hit) {
+      setState({ kind: "ok", cid, step: hit });
+      return;
+    }
+
+    // Otherwise fetch the real trace from IPFS through the indexer proxy.
+    try {
+      const res = await fetch(`${API_BASE}/api/trace/${encodeURIComponent(cid)}`, {
+        cache: "no-store",
+      });
+      if (res.ok) {
+        const body = (await res.json()) as { trace: object };
+        setState({ kind: "live", cid, trace: body.trace });
+        return;
+      }
+    } catch {
+      /* fall through to miss */
+    }
+    setState({ kind: "miss", cid });
   }
 
   return (
@@ -88,7 +108,7 @@ export function TraceExplorer() {
         {state.kind === "loading" && (
           <div className="flex items-center justify-center gap-2 py-8 font-mono text-[11px] uppercase tracking-[0.18em] text-muted">
             <span className="h-2 w-2 animate-pulse rounded-full bg-accent" />
-            Fetching from web3.storage…
+            Resolving from IPFS…
           </div>
         )}
         {state.kind === "miss" && (
@@ -100,13 +120,34 @@ export function TraceExplorer() {
             />
             <div className="space-y-1">
               <p className="text-[13px] text-foreground/90">
-                No matching anchor on Arc testnet
+                Couldn&apos;t resolve that CID
               </p>
               <p className="font-mono text-[11px] text-muted">
-                CID {state.cid.slice(0, 24)}… was not found in the current
-                ResponseAttested event index.
+                {state.cid.slice(0, 24)}… isn&apos;t a known seed trace and
+                couldn&apos;t be fetched from the IPFS gateway (a `dev:` stub
+                CID won&apos;t resolve — set PINATA_JWT to pin real traces).
               </p>
             </div>
+          </div>
+        )}
+        {state.kind === "live" && (
+          <div className="space-y-4">
+            <div className="flex items-start gap-3 rounded-md border border-emerald-400/20 bg-emerald-400/[0.04] p-4">
+              <CheckmarkCircle02Icon
+                size={15}
+                strokeWidth={1.5}
+                className="mt-0.5 text-emerald-300"
+              />
+              <div className="space-y-1">
+                <p className="text-[13px] text-foreground/95">
+                  Trace fetched from IPFS
+                </p>
+                <p className="font-mono text-[11px] text-muted">
+                  {state.cid.slice(0, 28)}… · resolved via gateway
+                </p>
+              </div>
+            </div>
+            <JsonBlock label="Reasoning trace" value={state.trace} tone="output" />
           </div>
         )}
         {state.kind === "ok" && (
