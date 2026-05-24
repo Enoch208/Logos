@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { PlusSignIcon, Search01Icon } from "hugeicons-react";
 import { SEED_SPECIALISTS } from "@/data/mockData";
+import { api } from "@/lib/api";
 import { SectionHeading } from "@/components/dashboard/SectionHeading";
 import { SpecialistCard } from "@/components/dashboard/SpecialistCard";
 
@@ -13,10 +14,25 @@ const SERVICE_TYPES = Array.from(
 export function SpecialistGrid() {
   const [query, setQuery] = useState("");
   const [service, setService] = useState<string | null>(null);
+  // Seed renders immediately; the indexer's live directory (on-chain reputation
+  // + real queries-served / USDC-earned) takes over once mounted, falling back
+  // to seed if the API is unreachable.
+  const [specialists, setSpecialists] = useState(SEED_SPECIALISTS);
+
+  useEffect(() => {
+    let alive = true;
+    api
+      .specialists()
+      .then((next) => alive && next.length > 0 && setSpecialists(next))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const matches = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return SEED_SPECIALISTS.filter((s) => {
+    return specialists.filter((s) => {
       if (service && s.serviceType !== service) return false;
       if (!q) return true;
       return (
@@ -25,7 +41,7 @@ export function SpecialistGrid() {
         s.serviceType.replace(/_/g, " ").toLowerCase().includes(q)
       );
     });
-  }, [query, service]);
+  }, [query, service, specialists]);
 
   return (
     <section id="specialists" className="space-y-5">

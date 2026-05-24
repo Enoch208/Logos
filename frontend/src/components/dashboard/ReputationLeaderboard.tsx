@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { SEED_SPECIALISTS } from "@/data/mockData";
+import { api } from "@/lib/api";
 import { SectionHeading } from "@/components/dashboard/SectionHeading";
 import { LeaderboardRow } from "@/components/dashboard/LeaderboardRow";
 
@@ -15,9 +16,22 @@ const TABS: { id: Metric; label: string }[] = [
 
 export function ReputationLeaderboard() {
   const [metric, setMetric] = useState<Metric>("earned");
+  // Live directory (on-chain reputation + real queries/earned); seed fallback.
+  const [specialists, setSpecialists] = useState(SEED_SPECIALISTS);
+
+  useEffect(() => {
+    let alive = true;
+    api
+      .specialists()
+      .then((next) => alive && next.length > 0 && setSpecialists(next))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const ranked = useMemo(() => {
-    const copy = [...SEED_SPECIALISTS];
+    const copy = [...specialists];
     copy.sort((a, b) => {
       if (metric === "earned")
         return b.metrics.totalEarnedUsdc - a.metrics.totalEarnedUsdc;
@@ -26,7 +40,7 @@ export function ReputationLeaderboard() {
       return b.reputation - a.reputation;
     });
     return copy;
-  }, [metric]);
+  }, [metric, specialists]);
 
   const max = useMemo(() => {
     if (metric === "earned")
