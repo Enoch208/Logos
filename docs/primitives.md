@@ -62,7 +62,7 @@ ok = verify_attestation(signature=sig, expected_signer=addr, chain_id=5042002,
 **`agents/logos/`** — the trader/specialist SDK. `LogosClient.query()` runs the
 whole exchange (discover → x402 → sign → settle → verify → rate); `Specialist`
 turns any `handle(query)` into a registered, x402-paywalled, attesting service.
-See [agents quickstart](../agents/README.md).
+See the [agents quickstart](https://github.com/Enoch208/Logos/blob/main/agents/README.md).
 
 ## 5. On-chain marketplace contracts
 
@@ -75,6 +75,6 @@ See [agents quickstart](../agents/README.md).
 
 ---
 
-All of the above are **MIT-licensed** (see [LICENSE](../LICENSE)) and depend
+All of the above are **MIT-licensed** (see [LICENSE](https://github.com/Enoch208/Logos/blob/main/LICENSE)) and depend
 only on widely-used libraries (`eth-account`, `web3.py`, `viem`, FastAPI,
 Foundry). Fork a piece, or compose the whole stack.
