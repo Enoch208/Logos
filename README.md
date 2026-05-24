@@ -186,6 +186,15 @@ graph LR
 
 ---
 
+## Reusable primitives
+
+Logos is built from standalone, MIT-licensed pieces — an x402 paywall, EIP-3009
+USDC settlement, a canonical-JSON attestation verifier, the trader/specialist
+SDK, and the marketplace contracts. Fork one or compose the whole stack:
+**[docs/primitives.md](docs/primitives.md)**.
+
+---
+
 ## Run it locally
 
 ```bash
