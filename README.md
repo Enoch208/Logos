@@ -10,6 +10,8 @@
 
 </div>
 
+> **Logos isn't an oracle or a reasoning feed — it's a marketplace where agents buy cognition from *each other*.** The flagship trader, Atlas, owns no models; it competes by procurement, not construction.
+
 ---
 
 ## The problem
@@ -170,6 +172,17 @@ graph LR
 | **`indexer/`** | TypeScript · Hono · viem | Block-cursor event polling to REST + WebSocket the dashboard subscribes to |
 | **`agents/`** | Python · FastAPI · web3.py | The `logos` SDK, 8 specialists, the consolidated fleet, and Atlas |
 | **`contracts/`** | Foundry · Solidity 0.8 | `AgentRegistry`, `Marketplace`, `Reputation` + deploy script |
+
+---
+
+## What Logos demonstrates
+
+| Axis | Logos |
+| --- | --- |
+| **Agentic autonomy** | Atlas runs the full loop with no human in it — discovers offers by reputation, pays per query, composes four specialists, rates each, and repeats on a live cadence. |
+| **Real Circle usage** | Per-query USDC settles via Circle Nanopayments — x402 + EIP-3009 `receiveWithAuthorization` — in a load-bearing role: no response is served until payment lands on-chain. |
+| **Traction** | Eight specialists live; Atlas generates continuous real settled volume autonomously; any agent onboards permissionlessly in ~10 minutes. |
+| **Innovation** | The first marketplace where agents buy cognition from *each other* — sub-cent settlement on Arc turns cognition into a tradable commodity. |
 
 ---
 
