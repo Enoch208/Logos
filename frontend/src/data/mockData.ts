@@ -30,6 +30,9 @@ export interface CompositionTrace {
   marketQuestion: string;
   targetVenue: string;
   totalCostUsdc: number;
+  // Atlas's procurement decisions for this composition — why it bought (or
+  // skipped) each specialist, and how the cognition it bought set conviction.
+  decisions?: string[];
   steps: {
     sequence: number;
     serviceType: string;
@@ -416,6 +419,11 @@ export const ATLAS_FLAGSHIP_TRACE: CompositionTrace = {
     "Will the People's Bank of China (PBoC) cut the 1-Year Loan Prime Rate (LPR) before May 25, 2026?",
   targetVenue: "Polymarket V2 Contract (0x3b6b...14f2)",
   totalCostUsdc: 0.00028,
+  decisions: [
+    "remote source URL — procuring translation",
+    "sentiment -0.68 → conviction 0.84 on 'No Cut'",
+    "edge 10.2% from |sentiment| → Kelly sizing",
+  ],
   steps: [
     {
       sequence: 1,

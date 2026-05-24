@@ -56,6 +56,22 @@ export function AtlasPanel() {
         </div>
       </div>
 
+      {trace.decisions && trace.decisions.length > 0 && (
+        <div className="border-b border-white/5 px-5 py-4">
+          <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted">
+            Decisions · procurement, not execution
+          </span>
+          <ul className="mt-2.5 space-y-1.5">
+            {trace.decisions.map((d, i) => (
+              <li key={i} className="flex items-start gap-2 text-[12.5px] text-foreground/80">
+                <span className="mt-0.5 font-mono text-[10px] text-accent">→</span>
+                <span className="font-mono leading-snug">{d}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <ol className="px-5 py-5">
         {trace.steps.map((step) => (
           <AtlasStep
