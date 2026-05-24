@@ -2,11 +2,10 @@ import { Hono } from "hono";
 import {
   getAtlas,
   getRecentTransactions,
-  getSpecialists,
   getSummary,
   setTraceCid,
 } from "./store.js";
-import { getMarketOffers } from "./offers.js";
+import { getLiveSpecialists, getMarketOffers } from "./offers.js";
 import { config } from "./config.js";
 
 export const api = new Hono();
@@ -17,7 +16,7 @@ api.get("/health", (c) =>
 
 api.get("/summary", (c) => c.json(getSummary()));
 
-api.get("/specialists", (c) => c.json(getSpecialists()));
+api.get("/specialists", async (c) => c.json(await getLiveSpecialists()));
 
 api.get("/transactions", async (c) => {
   const limit = Number(c.req.query("limit") ?? 30);
@@ -94,9 +93,9 @@ api.post("/ingest/trace", async (c) => {
   return c.json({ ok: true });
 });
 
-api.get("/leaderboard", (c) => {
+api.get("/leaderboard", async (c) => {
   const metric = c.req.query("metric") ?? "earned";
-  const ranked = [...getSpecialists()].sort((a, b) => {
+  const ranked = [...(await getLiveSpecialists())].sort((a, b) => {
     if (metric === "queries")
       return b.metrics.queriesServed - a.metrics.queriesServed;
     if (metric === "reputation") return b.reputation - a.reputation;

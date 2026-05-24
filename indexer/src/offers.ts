@@ -6,8 +6,8 @@ import {
   type PublicClient,
 } from "viem";
 import { chainReady, config } from "./config.js";
-import { getSpecialists } from "./store.js";
-import type { MarketOffer } from "./types.js";
+import { getSpecialists, getSpecialistTotals } from "./store.js";
+import type { MarketOffer, SpecialistAgent } from "./types.js";
 
 /**
  * FR-2 — query routing / discovery.
@@ -58,6 +58,30 @@ async function liveReputation(name: string, fallback: number): Promise<number> {
   } catch {
     return fallback;
   }
+}
+
+/**
+ * The specialist directory + leaderboard, with live data overlaid on the seed
+ * descriptors: reputation read from the on-chain Reputation contract, and
+ * queries-served / USDC-earned from the cumulative per-specialist tallies that
+ * grow as real RATED queries stream through. Latency and compliance stay at
+ * their representative baselines (the indexer doesn't meter them per query).
+ */
+export async function getLiveSpecialists(): Promise<SpecialistAgent[]> {
+  return Promise.all(
+    getSpecialists().map(async (s) => {
+      const totals = getSpecialistTotals(s.name);
+      return {
+        ...s,
+        reputation: await liveReputation(s.name, s.reputation),
+        metrics: {
+          ...s.metrics,
+          queriesServed: totals.queries,
+          totalEarnedUsdc: totals.earned,
+        },
+      };
+    }),
+  );
 }
 
 export async function getMarketOffers(opts: {

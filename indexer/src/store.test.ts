@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import {
   getAtlas,
   getRecentTransactions,
+  getSpecialistTotals,
   getSpecialists,
   getSummary,
   initStore,
@@ -115,5 +116,33 @@ describe("store", () => {
 
   it("resolveTraceCid falls back to the anchor when no CID was reported", () => {
     expect(resolveTraceCid("0xneverReported", "0xanchor")).toBe("0xanchor");
+  });
+
+  it("RATED transactions bump that specialist's live totals (queries + earned)", async () => {
+    const before = getSpecialistTotals("mandarin_macro");
+    await recordTransaction(
+      tx({
+        id: "0xlivequery1",
+        specialistId: "0x8a4b3c…6q7r (mandarin_macro)",
+        status: "RATED",
+        costUsdc: 0.00015,
+      }),
+    );
+    const after = getSpecialistTotals("mandarin_macro");
+    expect(after.queries).toBe(before.queries + 1);
+    expect(after.earned).toBeCloseTo(before.earned + 0.00015, 8);
+  });
+
+  it("non-RATED transactions do not bump totals (counts each query once)", async () => {
+    const before = getSpecialistTotals("twitter_sentiment");
+    await recordTransaction(
+      tx({
+        id: "0xescrowonly",
+        specialistId: "0x3f4a5b…8s9t (twitter_sentiment)",
+        status: "ESCROWED",
+        costUsdc: 0.00008,
+      }),
+    );
+    expect(getSpecialistTotals("twitter_sentiment").queries).toBe(before.queries);
   });
 });

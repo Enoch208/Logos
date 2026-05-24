@@ -57,6 +57,32 @@ export function resolveTraceCid(queryId: string, fallback: string): string {
   return traceCidByQuery.get(queryId.toLowerCase()) ?? fallback;
 }
 
+// Per-specialist cumulative tallies, seeded from each specialist's baseline
+// metrics and incremented as real RATED queries stream in. This is what lets
+// the directory + leaderboard reflect live activity instead of a fixed seed.
+const specialistTotals = new Map<string, { queries: number; earned: number }>();
+for (const s of SEED_SPECIALISTS) {
+  specialistTotals.set(s.name, {
+    queries: s.metrics.queriesServed,
+    earned: s.metrics.totalEarnedUsdc,
+  });
+}
+
+function bumpSpecialistTotals(tx: AgentTransaction): void {
+  if (tx.status !== "RATED") return; // count each completed query exactly once
+  const name = /\(([^)]+)\)/.exec(tx.specialistId)?.[1];
+  if (!name) return;
+  const t = specialistTotals.get(name);
+  if (!t) return;
+  t.queries += 1;
+  t.earned += tx.costUsdc;
+}
+
+export function getSpecialistTotals(name: string): { queries: number; earned: number } {
+  const t = specialistTotals.get(name);
+  return t ? { queries: t.queries, earned: t.earned } : { queries: 0, earned: 0 };
+}
+
 export async function initStore(): Promise<{ kind: "mongo" | "memory" }> {
   if (!config.mongoUri) return { kind: "memory" };
   try {
@@ -104,6 +130,7 @@ export async function getRecentTransactions(limit = 30): Promise<AgentTransactio
 }
 
 export async function recordTransaction(tx: AgentTransaction): Promise<void> {
+  bumpSpecialistTotals(tx);
   memory.state.transactions = [tx, ...memory.state.transactions].slice(0, MAX_FEED);
   memory.state.summary = {
     ...memory.state.summary,
