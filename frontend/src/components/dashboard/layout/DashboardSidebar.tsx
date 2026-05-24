@@ -94,7 +94,7 @@ function NavInner({ pathname }: { pathname: string }) {
           </span>
           <div className="flex flex-col leading-tight">
             <span className="text-[12px] text-foreground/90">Arc testnet</span>
-            <span className="font-mono text-[10px] text-muted">block 8,412,910</span>
+            <span className="font-mono text-[10px] text-muted">chain 5042002</span>
           </div>
         </div>
       </div>

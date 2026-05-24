@@ -12,9 +12,9 @@ const PILLARS = [
   },
   {
     label: "Settlement",
-    title: "Three signed responses, one composed bet",
+    title: "Three signed responses, one composed position",
     body:
-      "Each specialist settles in milliseconds via Circle Nanopayments. The full composition trace is hashed and anchored on Arc — verifiable from CID alone.",
+      "Each specialist is paid in real USDC per query via Circle Nanopayments (EIP-3009). The full composition trace is hashed and anchored on Arc — verifiable from CID alone.",
   },
 ] as const;
 
@@ -31,8 +31,9 @@ export function AtlasSection() {
           <span className="text-muted">construction.</span>
         </h2>
         <p className="mt-6 max-w-2xl text-lg leading-relaxed text-muted">
-          Atlas wins on Polymarket V2 by buying cognition, not building it. Three
-          specialists handle translation, sentiment, structuring. One trade, under a cent.
+          Atlas composes a Polymarket V2 position by buying cognition, not building it.
+          Three specialists handle translation, sentiment, and structuring. One
+          composition, under a cent.
         </p>
         <div className="mt-8 inline-flex">
           <GhostButton

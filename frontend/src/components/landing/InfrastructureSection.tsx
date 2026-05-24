@@ -21,8 +21,9 @@ export function InfrastructureSection() {
           <span className="text-muted">scale without ceremony.</span>
         </h2>
         <p className="mt-6 max-w-2xl text-lg leading-relaxed text-muted">
-          Marketplace contract anchors every exchange. Circle Gateway settles USDC via
-          x402. Query, payment, attestation, rating — the loop closes in under 30 seconds.
+          Marketplace contract anchors every exchange. Circle Nanopayments settle real
+          USDC per query via x402 and EIP-3009. Query, payment, attestation, rating —
+          the loop closes in seconds.
         </p>
         <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center">
           <PrimaryButton
@@ -52,7 +53,7 @@ export function InfrastructureSection() {
         />
         <InfraCard
           title="Composition over construction"
-          description="Atlas buys translation, sentiment, and structuring per query. One Polymarket bet, three specialists, under a cent."
+          description="Atlas buys translation, sentiment, and structuring per query. One Polymarket position, three specialists, under a cent."
           visual={<CompositionVisual />}
         />
         <InfraCard
