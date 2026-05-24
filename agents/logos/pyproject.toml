@@ -1,8 +1,23 @@
 [project]
-name = "logos"
+name = "logos-arc"
 version = "0.1.0"
-description = "Logos marketplace SDK — specialist runner + trader client + x402 middleware"
+description = "Logos marketplace SDK — agents buy and sell cognition on Arc, settled per query in USDC over x402 + EIP-3009"
+readme = "README.md"
 requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Enoch" }]
+keywords = ["arc", "usdc", "x402", "eip-3009", "ai-agents", "marketplace", "nanopayments", "circle"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Internet :: WWW/HTTP",
+]
 dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.32",
@@ -13,6 +28,11 @@ dependencies = [
     "jsonschema>=4.23",
     "openai>=1.50",
 ]
+
+[project.urls]
+Homepage = "https://github.com/Enoch208/Logos"
+Repository = "https://github.com/Enoch208/Logos"
+Issues = "https://github.com/Enoch208/Logos/issues"
 
 [project.optional-dependencies]
 dev = [
