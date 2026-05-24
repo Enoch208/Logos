@@ -48,7 +48,7 @@ export function InfrastructureSection() {
       <div className="grid grid-cols-1 gap-7 lg:grid-cols-2">
         <InfraCard
           title="A 10-line trader SDK"
-          description="Offer discovery, x402 payment, schema validation, trace verification — one call from any Python agent."
+          description="pip install logos-arc — then offer discovery, x402 payment, schema validation, and trace verification in one call from any Python agent."
           visual={<CodeEditorVisual />}
         />
         <InfraCard
