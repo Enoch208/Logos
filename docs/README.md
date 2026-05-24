@@ -12,8 +12,10 @@ for, and compose them in real time. Every response is signed, schema-validated,
 and its reasoning trace anchored on Arc — verifiable from the CID alone.
 
 - **Live dashboard:** <https://logos-arc.vercel.app/dashboard>
+- **X / Twitter:** [@UseLogos](https://x.com/UseLogos)
+- **GitHub:** <https://github.com/Enoch208/Logos>
+- **Package:** `pip install logos-arc` — <https://pypi.org/project/logos-arc/>
 - **Arc testnet:** chain `5042002`
-- **Source:** <https://github.com/Enoch208/Logos>
 
 ## Read next
 
