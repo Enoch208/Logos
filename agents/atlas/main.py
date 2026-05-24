@@ -44,10 +44,32 @@ class Composition:
     market_question: str
     target_venue: str
     steps: list[CompositionStep]
+    decisions: list[str] = field(default_factory=list)
 
     @property
     def total_cost_usdc(self) -> float:
         return sum(s.cost_usdc for s in self.steps)
+
+
+def _needs_translation(payload: dict[str, Any]) -> tuple[bool, str]:
+    """Atlas decides whether to buy translation at all — it skips the spend when
+    the source is already English. Returns (need, rationale)."""
+    if "text_url" in payload:
+        return True, "remote source URL — procuring translation"
+    text = str(payload.get("raw_text", ""))
+    if not text:
+        return True, "no inline source — procuring translation"
+    if any("一" <= ch <= "鿿" for ch in text):
+        return True, "source contains CJK — procuring translation"
+    return False, "source already English — skipped translation (saved $0.000150)"
+
+
+def _conviction_from_sentiment(sentiment_score: float, fallback: float) -> float:
+    """Conviction is set by the sentiment Atlas just bought, not hardcoded:
+    stronger sentiment (either direction) → higher conviction."""
+    if sentiment_score == 0.0:
+        return fallback
+    return round(min(0.95, 0.5 + abs(sentiment_score) * 0.5), 2)
 
 
 @dataclass
@@ -101,31 +123,51 @@ SCENARIOS: list[Scenario] = [
         prediction="Dovish",
         conviction=0.61,
     ),
+    Scenario(
+        # English source — Atlas should DECIDE to skip translation and save the spend.
+        market_question="Will the US CPI print come in below consensus this month?",
+        translation_input={
+            "raw_text": "US CPI is tracking near consensus; core services inflation stays sticky per the latest prints."
+        },
+        sentiment_query="US CPI inflation consensus expectations",
+        prediction="Below Consensus",
+        conviction=0.62,
+    ),
 ]
 
 
 async def run_atlas(client: LogosClient, scenario: Scenario) -> Composition:
     steps: list[CompositionStep] = []
-
+    decisions: list[str] = []
     print(f"[atlas] market: {scenario.market_question}")
-    print("[atlas] procuring translation from mandarin_macro …")
-    translation = await client.query(
-        service_type="translation",
-        payload=scenario.translation_input,
-        max_price_usdc=0.0005,
-    )
-    steps.append(
-        CompositionStep(
-            sequence=1,
-            specialist="mandarin_macro",
+
+    def decide(rationale: str) -> None:
+        decisions.append(rationale)
+        print(f"[atlas] decision · {rationale}")
+
+    # Decision 1 — buy translation only if the source isn't already English.
+    need_translation, why = _needs_translation(scenario.translation_input)
+    decide(why)
+    if need_translation:
+        print("[atlas] procuring translation from mandarin_macro …")
+        translation = await client.query(
             service_type="translation",
             payload=scenario.translation_input,
-            response=translation.payload,
-            cost_usdc=0.000150,
-            trace_cid=translation.trace_cid,
+            max_price_usdc=0.0005,
         )
-    )
+        steps.append(
+            CompositionStep(
+                sequence=len(steps) + 1,
+                specialist="mandarin_macro",
+                service_type="translation",
+                payload=scenario.translation_input,
+                response=translation.payload,
+                cost_usdc=0.000150,
+                trace_cid=translation.trace_cid,
+            )
+        )
 
+    sentiment_score = 0.0
     if "market_sentiment" in client.specialist_directory:
         print("[atlas] procuring sentiment from twitter_sentiment …")
         sentiment = await client.query(
@@ -133,9 +175,10 @@ async def run_atlas(client: LogosClient, scenario: Scenario) -> Composition:
             payload={"query": scenario.sentiment_query},
             max_price_usdc=0.0005,
         )
+        sentiment_score = float(sentiment.payload.get("sentiment_score", 0.0))
         steps.append(
             CompositionStep(
-                sequence=2,
+                sequence=len(steps) + 1,
                 specialist="twitter_sentiment",
                 service_type="market_sentiment",
                 payload={"query": scenario.sentiment_query},
@@ -145,12 +188,16 @@ async def run_atlas(client: LogosClient, scenario: Scenario) -> Composition:
             )
         )
 
+    # Decision 2 — conviction is driven by the sentiment Atlas just bought.
+    conviction = _conviction_from_sentiment(sentiment_score, scenario.conviction)
+    decide(
+        f"sentiment {sentiment_score:+.2f} → conviction {conviction:.2f} "
+        f"on '{scenario.prediction}'"
+    )
+
     if "polymarket_structuring" in client.specialist_directory:
         print("[atlas] procuring structuring from polymarket_structurer …")
-        structuring_payload = {
-            "prediction": scenario.prediction,
-            "conviction": scenario.conviction,
-        }
+        structuring_payload = {"prediction": scenario.prediction, "conviction": conviction}
         structuring = await client.query(
             service_type="polymarket_structuring",
             payload=structuring_payload,
@@ -158,7 +205,7 @@ async def run_atlas(client: LogosClient, scenario: Scenario) -> Composition:
         )
         steps.append(
             CompositionStep(
-                sequence=3,
+                sequence=len(steps) + 1,
                 specialist="polymarket_structurer",
                 service_type="polymarket_structuring",
                 payload=structuring_payload,
@@ -169,12 +216,10 @@ async def run_atlas(client: LogosClient, scenario: Scenario) -> Composition:
         )
 
     if "capital_allocation" in client.specialist_directory:
+        # Decision 3 — size the position by the edge implied by sentiment strength.
+        edge_pct = round(abs(sentiment_score) * 15.0, 2)
+        decide(f"edge {edge_pct:.1f}% from |sentiment| → Kelly sizing")
         print("[atlas] procuring Kelly sizing from kelly_sizer …")
-        sentiment_score = 0.0
-        for s in steps:
-            if s.service_type == "market_sentiment":
-                sentiment_score = float(s.response.get("sentiment_score", 0.0))
-        edge_pct = abs(sentiment_score) * 15.0  # heuristic v1
         sizing_payload = {"edge_percentage": edge_pct, "odds_fraction": 1.0}
         sizing = await client.query(
             service_type="capital_allocation",
@@ -197,6 +242,7 @@ async def run_atlas(client: LogosClient, scenario: Scenario) -> Composition:
         market_question=scenario.market_question,
         target_venue="Polymarket V2",
         steps=steps,
+        decisions=decisions,
     )
     await _route_to_polymarket(composition)
     return composition
@@ -257,6 +303,8 @@ def _print_composition(composition: Composition) -> None:
             f"  #{step.sequence} {step.specialist:<24} "
             f"${step.cost_usdc:.6f} → trace {step.trace_cid[:20]}…"
         )
+    for d in composition.decisions:
+        print(f"  · decision: {d}")
 
 
 def _loop_interval() -> int:
