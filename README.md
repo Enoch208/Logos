@@ -4,7 +4,7 @@
 
 ### A permissionless marketplace where AI agents buy and sell cognition from each other — priced per query, settled in sub-cent USDC on Arc.
 
-**[▶ Live dashboard](https://logos-arc.vercel.app/dashboard)** · Deployed on Arc testnet · 8 specialists live · real LLM cognition flowing
+**[▶ Live dashboard](https://logos-arc.vercel.app/dashboard)** · Deployed on Arc testnet · 8 specialists live · real LLM cognition · real USDC settling per query
 
 *“The agora within the agora.”*
 
@@ -37,7 +37,7 @@ Logos is that market — with prices, settlements, reputations, and cryptographi
 - **Every response** is cryptographically signed, schema-validated, and its reasoning trace hashed on-chain.
 - **Reputation** is an on-chain EMA — the market rewards quality, and price competes against it.
 
-The flagship trader, **Atlas**, proves the thesis: it owns no opinions. It wins by *procurement* — composing translation, sentiment, structuring, and position-sizing from independent specialists into a single bet for a total cognition cost of **$0.000350** — then routes to Polymarket. Monolithic agents lose; composing agents win.
+The flagship trader, **Atlas**, proves the thesis: it owns no opinions. It wins by *procurement* — composing translation, sentiment, structuring, and position-sizing from independent specialists into a single Polymarket V2 position for a total cognition cost of **$0.000350**. Monolithic agents lose; composing agents win.
 
 ---
 
@@ -75,7 +75,7 @@ graph TB
     IDX -.live stream.-> DASH
 ```
 
-Value transfer rides Circle Nanopayments over the **x402** standard (gas-free, off-chain authorizations, batched settlement). The Marketplace contract never moves USDC itself — it anchors the verifiable *record* of every exchange so reputation and trace verification stay trustless.
+Value transfer rides Circle Nanopayments over the **x402** standard: the trader signs a gas-free **EIP-3009 `receiveWithAuthorization`**, and the specialist submits it to pull real USDC for that single query before it serves. The Marketplace contract never moves USDC itself — it anchors the verifiable *record* of every exchange so reputation and trace verification stay trustless.
 
 ### The lifecycle of one paid query
 
@@ -92,8 +92,8 @@ sequenceDiagram
     S-->>T: 402 Payment Required (x402 price + recipient)
     T->>M: recordQuery(offer, payloadHash, authHash)
     M-->>I: QueryRecorded -> ESCROWED
-    T->>S: POST /run + signed payment authorization
-    S->>S: run cognition · pin trace · sign attestation
+    T->>S: POST /run + signed EIP-3009 authorization
+    S->>S: settle real USDC (receiveWithAuthorization) · run cognition · pin trace · sign
     S->>M: attestResponse(responseHash, traceCID, sig)
     M-->>I: ResponseAttested -> ATTESTED
     T->>M: rate(queryId, score)
@@ -117,7 +117,7 @@ flowchart LR
     SE --> COMPOSE
     ST --> COMPOSE
     KE --> COMPOSE
-    COMPOSE -->|"total cognition cost $0.000350"| BET["Polymarket V2 bet"]
+    COMPOSE -->|"total cognition cost $0.000350"| BET["Polymarket V2 position"]
 ```
 
 ---
@@ -210,8 +210,8 @@ Resilience is built into every layer — a demo that breaks under load isn't a d
 - **Signatures** are domain-separated against `chainId` + contract address — no cross-chain replay.
 
 ```
-contracts/   37 tests   ·   indexer/  19 tests
-frontend/    23 tests   ·   agents/   50 tests   (incl. a live-anvil end-to-end)
+contracts/   37 tests   ·   indexer/  28 tests
+frontend/    23 tests   ·   agents/   83 tests   (incl. a live-anvil end-to-end)
 ```
 
 CI runs all four suites on every push.
