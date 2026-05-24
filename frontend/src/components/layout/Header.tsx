@@ -2,7 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 
 const NAV_LINKS = [
-  { label: "Marketplace", href: "#marketplace" },
+  { label: "Marketplace", href: "/dashboard" },
   { label: "Infrastructure", href: "#infrastructure" },
   { label: "Atlas", href: "#atlas" },
   { label: "Specialists", href: "#specialists" },
@@ -46,12 +46,14 @@ export function Header() {
         </nav>
 
         <div className="flex items-center gap-3">
-          <Link
-            href="#"
+          <a
+            href="https://github.com/Enoch208/Logos"
+            target="_blank"
+            rel="noopener noreferrer"
             className="hidden cursor-pointer text-sm text-muted transition-colors hover:text-foreground sm:block"
           >
-            Sign in
-          </Link>
+            GitHub
+          </a>
           <Link
             href="/dashboard"
             className="cursor-pointer rounded-full bg-foreground px-4 py-2 text-sm font-medium text-black transition-all duration-200 ease-out hover:bg-foreground/90 active:scale-[0.98]"

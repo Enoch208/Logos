@@ -43,10 +43,10 @@ export function AtlasPanel() {
             </p>
           </div>
           <a
-            href="#"
+            href="/dashboard/trace"
             className="group inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-white/10 bg-white/[0.04] px-3 py-2 text-[12px] text-foreground transition-colors duration-200 ease-out hover:border-white/15 hover:bg-white/[0.08] active:scale-[0.98]"
           >
-            Full bet
+            Verify traces
             <ArrowUpRight01Icon
               size={11}
               strokeWidth={1.5}

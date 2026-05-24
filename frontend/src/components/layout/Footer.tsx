@@ -1,32 +1,44 @@
 import Image from "next/image";
 import Link from "next/link";
-import {
-  DiscordIcon,
-  Github01Icon,
-  NewTwitterIcon,
-} from "hugeicons-react";
+import { Github01Icon, NewTwitterIcon } from "hugeicons-react";
 import { LiveDot } from "@/components/ui/LiveDot";
+
+const REPO = "https://github.com/Enoch208/Logos";
 
 const COLUMNS = [
   {
     title: "Marketplace",
-    items: ["Specialists", "Live transactions", "Reputation", "Trace explorer"],
+    items: [
+      { label: "Specialists", href: "/dashboard/specialists" },
+      { label: "Live transactions", href: "/dashboard" },
+      { label: "Reputation", href: "/dashboard/leaderboard" },
+      { label: "Trace explorer", href: "/dashboard/trace" },
+    ],
   },
   {
     title: "Build",
-    items: ["Specialist template", "Trader SDK", "Contracts", "Schemas"],
+    items: [
+      { label: "Trader SDK · pip", href: "https://pypi.org/project/logos-arc/" },
+      { label: "Quickstart", href: `${REPO}/blob/main/docs/quickstart.md` },
+      { label: "Contracts", href: `${REPO}/tree/main/contracts` },
+      { label: "Primitives", href: `${REPO}/blob/main/docs/primitives.md` },
+    ],
   },
   {
-    title: "Thesis",
-    items: ["Whitepaper", "Atlas case study", "Coasean argument", "Roadmap"],
+    title: "Docs",
+    items: [
+      { label: "Concepts", href: `${REPO}/blob/main/docs/concepts.md` },
+      { label: "Settlement", href: `${REPO}/blob/main/docs/settlement.md` },
+      { label: "Live on Arc", href: `${REPO}/blob/main/docs/deployment.md` },
+      { label: "Source", href: REPO },
+    ],
   },
   {
     title: "Hackathon",
     items: [
-      "Agora Agents brief",
-      "Canteen research",
-      "Circle Nanopayments",
-      "Arc testnet",
+      { label: "Arc explorer", href: "https://testnet.arcscan.app" },
+      { label: "Arc docs", href: "https://docs.arc.io" },
+      { label: "Circle", href: "https://www.circle.com" },
     ],
   },
 ] as const;
@@ -49,14 +61,11 @@ export function Footer() {
             Canteen × Circle × Arc.
           </p>
           <div className="mt-6 flex items-center gap-3 text-muted">
-            <a href="#" aria-label="X" className="cursor-pointer transition-colors hover:text-foreground">
+            <a href="https://x.com/UseLogos" target="_blank" rel="noopener noreferrer" aria-label="X" className="cursor-pointer transition-colors hover:text-foreground">
               <NewTwitterIcon size={16} strokeWidth={1.5} />
             </a>
-            <a href="#" aria-label="GitHub" className="cursor-pointer transition-colors hover:text-foreground">
+            <a href="https://github.com/Enoch208/Logos" target="_blank" rel="noopener noreferrer" aria-label="GitHub" className="cursor-pointer transition-colors hover:text-foreground">
               <Github01Icon size={16} strokeWidth={1.5} />
-            </a>
-            <a href="#" aria-label="Discord" className="cursor-pointer transition-colors hover:text-foreground">
-              <DiscordIcon size={16} strokeWidth={1.5} />
             </a>
           </div>
         </div>
@@ -65,10 +74,24 @@ export function Footer() {
             <h4 className="mb-4 text-sm font-medium text-foreground">{col.title}</h4>
             <ul className="space-y-3 text-sm">
               {col.items.map((item) => (
-                <li key={item}>
-                  <a href="#" className="cursor-pointer text-muted transition-colors hover:text-foreground">
-                    {item}
-                  </a>
+                <li key={item.label}>
+                  {item.href.startsWith("/") ? (
+                    <Link
+                      href={item.href}
+                      className="cursor-pointer text-muted transition-colors hover:text-foreground"
+                    >
+                      {item.label}
+                    </Link>
+                  ) : (
+                    <a
+                      href={item.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="cursor-pointer text-muted transition-colors hover:text-foreground"
+                    >
+                      {item.label}
+                    </a>
+                  )}
                 </li>
               ))}
             </ul>

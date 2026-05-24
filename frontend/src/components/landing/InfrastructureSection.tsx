@@ -32,7 +32,9 @@ export function InfrastructureSection() {
             Start integrating
           </PrimaryButton>
           <a
-            href="#docs"
+            href="https://github.com/Enoch208/Logos/blob/main/docs/concepts.md"
+            target="_blank"
+            rel="noopener noreferrer"
             className="group inline-flex cursor-pointer items-center gap-1.5 text-sm font-medium text-foreground transition-colors hover:text-accent"
           >
             View architecture doc

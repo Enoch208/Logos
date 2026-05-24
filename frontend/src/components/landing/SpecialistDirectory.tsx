@@ -36,7 +36,7 @@ export function SpecialistDirectory() {
             permissionless
           </Pill>
           <a
-            href="#"
+            href="/dashboard/specialists"
             className="group inline-flex cursor-pointer items-center gap-1.5 text-sm font-medium text-foreground transition-colors hover:text-accent"
           >
             Browse all
