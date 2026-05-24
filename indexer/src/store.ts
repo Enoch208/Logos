@@ -57,15 +57,11 @@ export function resolveTraceCid(queryId: string, fallback: string): string {
   return traceCidByQuery.get(queryId.toLowerCase()) ?? fallback;
 }
 
-// Per-specialist cumulative tallies, seeded from each specialist's baseline
-// metrics and incremented as real RATED queries stream in. This is what lets
-// the directory + leaderboard reflect live activity instead of a fixed seed.
+// Per-specialist tallies start at zero and count only real RATED queries — the
+// directory + leaderboard reflect genuine settled activity, never a seed.
 const specialistTotals = new Map<string, { queries: number; earned: number }>();
 for (const s of SEED_SPECIALISTS) {
-  specialistTotals.set(s.name, {
-    queries: s.metrics.queriesServed,
-    earned: s.metrics.totalEarnedUsdc,
-  });
+  specialistTotals.set(s.name, { queries: 0, earned: 0 });
 }
 
 function bumpSpecialistTotals(tx: AgentTransaction): void {
@@ -110,7 +106,15 @@ export function getSpecialists(): SpecialistAgent[] {
 }
 
 export function getSummary(): MarketplaceSummary {
-  return memory.state.summary;
+  // queriesLastHour is computed live from the feed — distinct RATED queries in
+  // the trailing hour — rather than carried as a static number.
+  const hourAgo = Date.now() - 3_600_000;
+  const queriesLastHour = new Set(
+    memory.state.transactions
+      .filter((t) => t.status === "RATED" && Date.parse(t.timestamp) >= hourAgo)
+      .map((t) => t.id),
+  ).size;
+  return { ...memory.state.summary, queriesLastHour };
 }
 
 export function getAtlas(): CompositionTrace {

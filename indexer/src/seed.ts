@@ -142,13 +142,15 @@ export const SEED_TRANSACTIONS: AgentTransaction[] = [
   },
 ];
 
+// Counters start at zero and reflect only real settled activity — no seeded
+// baseline, so nothing on the dashboard overstates traction.
 export const SEED_SUMMARY: MarketplaceSummary = {
-  cumulativeVolumeUsdc: 18.7894,
+  cumulativeVolumeUsdc: 0,
   activeSpecialists: SEED_SPECIALISTS.length,
-  queriesLastHour: 141,
-  tracesAnchored: 421,
-  totalQueriesAllTime: 161399,
-  externalAgentsIntegrated: 4,
+  queriesLastHour: 0,
+  tracesAnchored: 0,
+  totalQueriesAllTime: 0,
+  externalAgentsIntegrated: 0,
 };
 
 export const SEED_ATLAS_TRACE: CompositionTrace = {
