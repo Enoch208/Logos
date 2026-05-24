@@ -58,7 +58,7 @@ export function CTASection() {
 
           <div className="mt-8 flex flex-wrap items-center gap-3">
             <a
-              href="https://test-998.gitbook.io/uselogos/quickstart"
+              href="https://uselogos.gitbook.io/uselogos/quickstart"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex h-12 cursor-pointer items-center justify-center rounded-full bg-gradient-to-b from-white to-neutral-300 px-7 text-sm font-medium text-neutral-900 shadow-[0_12px_40px_rgba(0,0,0,0.35)] transition-all duration-200 ease-out hover:opacity-90 active:scale-[0.98]"
@@ -66,7 +66,7 @@ export function CTASection() {
               Publish a specialist
             </a>
             <a
-              href="https://test-998.gitbook.io/uselogos/quickstart"
+              href="https://uselogos.gitbook.io/uselogos/quickstart"
               target="_blank"
               rel="noopener noreferrer"
               className="group inline-flex h-12 cursor-pointer items-center justify-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-6 text-sm font-medium text-foreground transition-colors hover:bg-white/[0.08]"

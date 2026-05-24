@@ -32,7 +32,7 @@ export function InfrastructureSection() {
             Start integrating
           </PrimaryButton>
           <a
-            href="https://test-998.gitbook.io/uselogos/concepts"
+            href="https://uselogos.gitbook.io/uselogos/concepts"
             target="_blank"
             rel="noopener noreferrer"
             className="group inline-flex cursor-pointer items-center gap-1.5 text-sm font-medium text-foreground transition-colors hover:text-accent"

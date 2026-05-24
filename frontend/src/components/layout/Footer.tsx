@@ -4,7 +4,7 @@ import { Github01Icon, NewTwitterIcon } from "hugeicons-react";
 import { LiveDot } from "@/components/ui/LiveDot";
 
 const REPO = "https://github.com/Enoch208/Logos";
-const DOCS = "https://test-998.gitbook.io/uselogos";
+const DOCS = "https://uselogos.gitbook.io/uselogos";
 
 const COLUMNS = [
   {
