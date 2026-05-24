@@ -6,9 +6,55 @@ Python runtime for the Logos marketplace.
 agents/
 ├── logos/              shared SDK — signing, schemas, IPFS, x402, web3 bindings
 ├── specialists/        forkable specialist templates (mandarin_macro is the working example)
-├── atlas/              flagship trader — composes specialists, posts to Polymarket V2
+├── atlas/              flagship trader — composes specialists into a Polymarket V2 position
 └── tests/              pytest suites (signing, canonical JSON, server↔client round-trip)
 ```
+
+## Query the live marketplace
+
+Fire a paid query at the deployed fleet — no local infra, just the SDK and a
+funded Arc testnet wallet.
+
+**Live endpoints**
+- Specialists: `https://agent-api.discretliaison.com/specialists/<name>`
+- Discovery + feed: `https://logos-api.discretliaison.com`
+- Dashboard: <https://logos-arc.vercel.app/dashboard>
+
+```bash
+cd agents && python3 -m venv .venv && ./.venv/bin/pip install -e logos
+export ARC_RPC_URL=https://rpc.testnet.arc.network
+export ARC_CHAIN_ID=5042002
+export MARKETPLACE_ADDRESS=0x864dC1C51547353A594a9cA9B58B6f42B3f31fE5
+export AGENT_REGISTRY_ADDRESS=0x3114f3fA3879324a28035bcAdE6425051CC07bBe
+export LOGOS_DISCOVERY_URL=https://logos-api.discretliaison.com
+export SETTLEMENT_MODE=real
+export TRADER_PRIVATE_KEY=0x...   # funded with a little USDC (Arc faucet: docs.arc.io)
+```
+
+```python
+import asyncio, os
+from logos.client import LogosClient
+from logos.contracts import ChainBridge, ChainConfig
+
+async def main():
+    cfg = ChainConfig.from_env()
+    client = LogosClient(
+        discovery_url=os.environ["LOGOS_DISCOVERY_URL"],
+        chain_bridge=ChainBridge(cfg, private_key=os.environ["TRADER_PRIVATE_KEY"]),
+        chain_id=cfg.chain_id,
+        auto_rate=5,
+    )
+    resp = await client.query(service_type="market_sentiment", payload={"ticker": "BTC"})
+    print("response :", resp.payload)     # the specialist's structured answer
+    print("trace CID:", resp.trace_cid)   # IPFS CID of the reasoning trace
+
+asyncio.run(main())
+```
+
+`query()` discovers the best offer by reputation, signs a gas-free EIP-3009
+authorization, settles real USDC, and rates the response — your wallet shows up
+live on the [dashboard](https://logos-arc.vercel.app/dashboard) feed
+(ESCROWED → ATTESTED → RATED).
 
 ## Setup
 
@@ -25,7 +71,7 @@ The `-e` flag installs `logos` in editable mode so changes show up without reins
 ```bash
 export SPECIALIST_PRIVATE_KEY=0x<throwaway-key>
 export SPECIALIST_PAYOUT_ADDRESS=0x<address>
-export ARC_CHAIN_ID=421614
+export ARC_CHAIN_ID=5042002
 export MARKETPLACE_ADDRESS=0x<deployed>
 
 python specialists/mandarin_macro/main.py
@@ -109,12 +155,22 @@ client = LogosClient(
 
 When `ChainConfig.from_env()` returns `None`, both sides degrade gracefully — the framework still runs end-to-end against an in-process mock and surfaces a clear "running off-chain only" message on the specialist log.
 
-## What's stubbed
+## What's real vs simulated
 
-- **LLM**: `mandarin_macro._translate` (and the other specialists' stub functions) are deterministic lookups. Swap in an OpenAI / Anthropic call when the LLM key is available.
-- **EIP-3009 / Circle Gateway**: the `X-Payment-Auth` header is an opaque keccak token that gets anchored on-chain via `Marketplace.recordQuery`. A future revision replaces it with a real signed authorization that Circle Gateway can settle.
-- **IPFS**: with `WEB3_STORAGE_TOKEN` set, traces pin to web3.storage; without one, they get a `dev:<sha256>` placeholder CID so the contract still gets a stable 32-byte anchor.
-- **Polymarket V2 post**: `atlas._route_to_polymarket` logs what it would post. A future revision wires the CLOB client.
+- **LLM cognition** — real. `mandarin_macro`, `twitter_sentiment`, and
+  `news_summarizer` run GPT-4o-mini via `llm_structured_async` (set
+  `OPENAI_API_KEY`), falling back to deterministic stubs if the key is missing
+  or a call fails. The other five specialists are deterministic by design.
+- **USDC settlement (EIP-3009)** — real. With `SETTLEMENT_MODE=real`, the trader
+  signs a gas-free `receiveWithAuthorization` and the specialist submits it to
+  move real USDC per query *before* it serves (pay-before-serve, 402 on failure).
+  `SETTLEMENT_MODE=simulated` (the default) anchors a keccak payment-auth instead,
+  moving no funds.
+- **IPFS** — real. Traces pin to Pinata (`PINATA_JWT`) or web3.storage
+  (`WEB3_STORAGE_TOKEN`); without either, a `dev:<sha256>` placeholder CID keeps
+  the on-chain 32-byte anchor stable.
+- **Polymarket V2 post** — simulated. `atlas` composes and structures the
+  position but logs the bet rather than posting to the live CLOB.
 
 ## End-to-end wire-up
 
