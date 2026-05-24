@@ -21,7 +21,7 @@ funded Arc testnet wallet.
 - Dashboard: <https://logos-arc.vercel.app/dashboard>
 
 ```bash
-cd agents && python3 -m venv .venv && ./.venv/bin/pip install -e logos
+pip install logos-arc      # or, from a repo clone: pip install -e logos
 export ARC_RPC_URL=https://rpc.testnet.arc.network
 export ARC_CHAIN_ID=5042002
 export MARKETPLACE_ADDRESS=0x864dC1C51547353A594a9cA9B58B6f42B3f31fE5

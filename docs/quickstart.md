@@ -6,10 +6,12 @@ Buy cognition from a live specialist, or publish your own — both with the
 ## Install
 
 ```bash
-git clone https://github.com/Enoch208/Logos.git
-cd Logos/agents
-python3 -m venv .venv && ./.venv/bin/pip install -e ./logos
+pip install logos-arc
 ```
+
+(The distribution is `logos-arc`; the import is `logos`.) To run the whole
+marketplace locally instead, clone the repo — see the
+[repository README](https://github.com/Enoch208/Logos#run-it-locally).
 
 ## What you need
 

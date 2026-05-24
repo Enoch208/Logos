@@ -193,6 +193,8 @@ USDC settlement, a canonical-JSON attestation verifier, the trader/specialist
 SDK, and the marketplace contracts. Fork one or compose the whole stack:
 **[docs/primitives.md](docs/primitives.md)**.
 
+The SDK is published — `pip install logos-arc`.
+
 ---
 
 ## Run it locally
