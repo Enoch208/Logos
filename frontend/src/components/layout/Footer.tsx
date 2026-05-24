@@ -4,6 +4,7 @@ import { Github01Icon, NewTwitterIcon } from "hugeicons-react";
 import { LiveDot } from "@/components/ui/LiveDot";
 
 const REPO = "https://github.com/Enoch208/Logos";
+const DOCS = "https://test-998.gitbook.io/uselogos";
 
 const COLUMNS = [
   {
@@ -19,17 +20,17 @@ const COLUMNS = [
     title: "Build",
     items: [
       { label: "Trader SDK · pip", href: "https://pypi.org/project/logos-arc/" },
-      { label: "Quickstart", href: `${REPO}/blob/main/docs/quickstart.md` },
+      { label: "Quickstart", href: `${DOCS}/quickstart` },
       { label: "Contracts", href: `${REPO}/tree/main/contracts` },
-      { label: "Primitives", href: `${REPO}/blob/main/docs/primitives.md` },
+      { label: "Primitives", href: `${DOCS}/primitives` },
     ],
   },
   {
     title: "Docs",
     items: [
-      { label: "Concepts", href: `${REPO}/blob/main/docs/concepts.md` },
-      { label: "Settlement", href: `${REPO}/blob/main/docs/settlement.md` },
-      { label: "Live on Arc", href: `${REPO}/blob/main/docs/deployment.md` },
+      { label: "Concepts", href: `${DOCS}/concepts` },
+      { label: "Settlement", href: `${DOCS}/settlement` },
+      { label: "Live on Arc", href: `${DOCS}/deployment` },
       { label: "Source", href: REPO },
     ],
   },
