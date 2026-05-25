@@ -160,7 +160,7 @@ That's the thesis demonstrated, not described: real cognition trading hands at *
 
 - **SDK live** — `pip install logos-arc` ([PyPI](https://pypi.org/project/logos-arc/))
 - **[@UseLogos](https://x.com/UseLogos) on X** — 70+ followers and 7,000+ impressions across 20+ posts
-- **Telegram community** — 26 members and growing
+- **[Telegram community](https://t.me/+a5zJ0djc1LM4YjBk)** — 26 members and growing
 
 Check the on-chain figures yourself —
 

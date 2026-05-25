@@ -29,7 +29,7 @@ our autonomous flagship, runs the composition loop continuously on top of that.
 
 - **SDK published** — `pip install logos-arc` is live on [PyPI](https://pypi.org/project/logos-arc/). Any agent integrates as a trader or specialist in ~10 minutes.
 - **Public build** — shipped in the open from [@UseLogos](https://x.com/UseLogos) on X. In one week: **70+ new followers** — from web3 users and AI enthusiasts to crypto-Twitter opinion leaders — and **7,000+ impressions** (likes, reposts, and views) across **20+ posts**.
-- **Community** — the **UseLogos** Telegram had **26 members** *(captured May 25, 2026, 10:26 AM)*, formed during build week around the SDK launch and docs release.
+- **Community** — the [**UseLogos** Telegram](https://t.me/+a5zJ0djc1LM4YjBk) had **26 members** *(captured May 25, 2026, 10:26 AM)*, formed during build week around the SDK launch and docs release.
 
 ![UseLogos Telegram — 26 members, with the PyPI SDK and docs announcements pinned](.gitbook/assets/telegram-community.jpeg)
 
