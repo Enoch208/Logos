@@ -83,6 +83,10 @@ body {
   background-color: var(--color-canvas);
   color: var(--color-foreground);
   font-family: var(--font-sans);
+  /* Guard against horizontal scroll on mobile (e.g. the marquee ticker
+     whose content is wider than the viewport). */
+  overflow-x: hidden;
+  max-width: 100%;
 }
 
 .logos-reveal {
