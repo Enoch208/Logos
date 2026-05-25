@@ -131,8 +131,9 @@ const EVENT_TO_STATUS: Record<string, QueryStatus> = {
 };
 
 const POLL_INTERVAL_MS = 4_000;
-const BACKFILL_BLOCKS = 200n; // ~13 min at 4s/block — covers a restart window
-const MAX_CHUNK_BLOCKS = 1_000n; // most RPCs cap getLogs at ~1k blocks
+const CATCHUP_INTERVAL_MS = 250; // while backfilling, don't wait a full poll
+const BACKFILL_BLOCKS = 200n; // fallback window when no deploy block is set
+const MAX_CHUNK_BLOCKS = 9_000n; // Arc RPC caps getLogs at a 10k block range
 const DEDUP_CAP = 10_000;
 
 const SERVICE_BY_HASH = buildServiceLookup();
@@ -262,14 +263,23 @@ export function startChainPoller(
     return true;
   }
 
+  let behind = false; // true while backfilling, so we poll fast until caught up
+
   async function tick(): Promise<void> {
     if (!running) return;
+    behind = false;
     try {
       const latest = await client.getBlockNumber();
       if (cursor === 0n) {
-        cursor = latest > BACKFILL_BLOCKS ? latest - BACKFILL_BLOCKS : 0n;
+        const deploy = config.arc.deployBlock ? BigInt(config.arc.deployBlock) : 0n;
+        cursor =
+          deploy > 0n
+            ? deploy - 1n
+            : latest > BACKFILL_BLOCKS
+              ? latest - BACKFILL_BLOCKS
+              : 0n;
         console.log(
-          `[chainPoller] starting cursor at block ${cursor} (latest=${latest}, backfill=${BACKFILL_BLOCKS})`,
+          `[chainPoller] starting cursor at block ${cursor} (latest=${latest}, deployBlock=${deploy || "unset"})`,
         );
       }
       if (latest <= cursor) return;
@@ -307,6 +317,7 @@ export function startChainPoller(
       }
 
       cursor = toBlock;
+      behind = toBlock < latest; // more history to replay before we're current
     } catch (err) {
       console.warn("[chainPoller] poll iteration failed:", err);
       // Don't advance the cursor on failure — we'll retry the same window
@@ -314,7 +325,7 @@ export function startChainPoller(
       // until the operator notices.
     } finally {
       if (running) {
-        timer = setTimeout(tick, POLL_INTERVAL_MS);
+        timer = setTimeout(tick, behind ? CATCHUP_INTERVAL_MS : POLL_INTERVAL_MS);
       }
     }
   }

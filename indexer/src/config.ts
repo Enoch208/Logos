@@ -20,6 +20,11 @@ export const config = {
     registry: process.env.AGENT_REGISTRY_ADDRESS ?? "",
     marketplace: process.env.MARKETPLACE_ADDRESS ?? "",
     reputation: process.env.REPUTATION_ADDRESS ?? "",
+    // Block the Marketplace was deployed at. On boot the poller backfills from
+    // here so the in-memory counters (volume / queries / traces / wallets)
+    // rebuild from full chain history and survive a restart, instead of
+    // resetting to a short trailing window. Unset = fall back to that window.
+    deployBlock: process.env.MARKETPLACE_DEPLOY_BLOCK ?? "",
   },
   ipfsGateway: process.env.IPFS_GATEWAY ?? "https://w3s.link/ipfs",
   allowedOrigins: csv(process.env.ALLOWED_ORIGINS ?? "http://localhost:3000"),
