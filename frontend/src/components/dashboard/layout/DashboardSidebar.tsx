@@ -19,6 +19,7 @@ type NavItem = {
   label: string;
   href: string;
   icon: typeof DashboardSquare01Icon;
+  external?: boolean;
 };
 
 const PRIMARY_NAV: NavItem[] = [
@@ -30,8 +31,13 @@ const PRIMARY_NAV: NavItem[] = [
 ];
 
 const SECONDARY_NAV: NavItem[] = [
-  { label: "Documentation", href: "/", icon: BookOpen02Icon },
-  { label: "Settings", href: "#", icon: Settings01Icon },
+  {
+    label: "Documentation",
+    href: "https://uselogos.gitbook.io/uselogos",
+    icon: BookOpen02Icon,
+    external: true,
+  },
+  { label: "Settings", href: "/dashboard/settings", icon: Settings01Icon },
 ];
 
 function isActive(pathname: string, href: string) {
@@ -40,21 +46,32 @@ function isActive(pathname: string, href: string) {
 }
 
 function NavLink({ item, active }: { item: NavItem; active: boolean }) {
-  return (
-    <Link
-      href={item.href}
-      className={`group flex cursor-pointer items-center gap-3 rounded-md px-3 py-2 text-[13px] transition-colors duration-200 ease-out ${
-        active
-          ? "bg-white/[0.06] text-foreground"
-          : "text-foreground/70 hover:bg-white/[0.04] hover:text-foreground"
-      }`}
-    >
+  const className = `group flex cursor-pointer items-center gap-3 rounded-md px-3 py-2 text-[13px] transition-colors duration-200 ease-out ${
+    active
+      ? "bg-white/[0.06] text-foreground"
+      : "text-foreground/70 hover:bg-white/[0.04] hover:text-foreground"
+  }`;
+  const inner = (
+    <>
       <item.icon
         size={15}
         strokeWidth={1.5}
         className={active ? "text-foreground" : "text-muted group-hover:text-foreground/90"}
       />
       <span>{item.label}</span>
+    </>
+  );
+
+  if (item.external) {
+    return (
+      <a href={item.href} target="_blank" rel="noopener noreferrer" className={className}>
+        {inner}
+      </a>
+    );
+  }
+  return (
+    <Link href={item.href} className={className}>
+      {inner}
     </Link>
   );
 }
@@ -80,7 +97,10 @@ function NavInner({ pathname }: { pathname: string }) {
         <ul className="space-y-0.5">
           {SECONDARY_NAV.map((item) => (
             <li key={item.label}>
-              <NavLink item={item} active={false} />
+              <NavLink
+                item={item}
+                active={item.external ? false : isActive(pathname, item.href)}
+              />
             </li>
           ))}
         </ul>
