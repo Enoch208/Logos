@@ -373,6 +373,8 @@ export interface MarketplaceSummary {
   tracesAnchored: number;
   totalQueriesAllTime: number;
   externalAgentsIntegrated: number;
+  distinctWallets: number;
+  externalWallets: number;
 }
 
 // Honest fallback: zeroed so the dashboard never shows seeded volume before the
@@ -384,6 +386,8 @@ export const MARKETPLACE_SUMMARY: MarketplaceSummary = {
   tracesAnchored: 0,
   totalQueriesAllTime: 0,
   externalAgentsIntegrated: 0,
+  distinctWallets: 0,
+  externalWallets: 0,
 };
 
 export interface VolumeBucket {

@@ -47,8 +47,15 @@ export function CountersStrip() {
       <CounterTile
         label="Active specialists"
         value={`${s.activeSpecialists}`}
-        unit={`/ ${s.activeSpecialists + s.externalAgentsIntegrated}`}
-        delta={{ direction: "up", text: `+${s.externalAgentsIntegrated} ext` }}
+        unit="live"
+        delta={
+          s.externalWallets > 0
+            ? {
+                direction: "up",
+                text: `${s.externalWallets} ext wallet${s.externalWallets === 1 ? "" : "s"}`,
+              }
+            : undefined
+        }
       />
       <CounterTile
         label="Queries · last hour"

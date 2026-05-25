@@ -30,6 +30,26 @@ export function LiveStatsStrip() {
     };
   }, []);
 
+  // External wallets — distinct traders that aren't Atlas / our own fleet — are
+  // the adoption signal, so they headline (amber) the moment the first one lands.
+  const hasExternal = s.externalWallets > 0;
+  const tiles: { value: string; label: string; accent?: boolean }[] = [
+    { value: formatNumberFull(s.totalQueriesAllTime), label: "queries settled" },
+  ];
+  if (hasExternal) {
+    tiles.push({
+      value: formatNumberFull(s.externalWallets),
+      label: s.externalWallets === 1 ? "external wallet" : "external wallets",
+      accent: true,
+    });
+  }
+  tiles.push({
+    value: formatUsdcCompact(s.cumulativeVolumeUsdc),
+    label: "USDC paid",
+    accent: !hasExternal,
+  });
+  tiles.push({ value: formatNumberFull(s.tracesAnchored), label: "traces anchored" });
+
   return (
     <section className="mx-auto mt-24 flex max-w-3xl flex-col items-center px-6 text-center">
       <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
@@ -46,10 +66,14 @@ export function LiveStatsStrip() {
         Real volume, verifiable on-chain.
       </h2>
 
-      <div className="mt-8 grid w-full grid-cols-3 divide-x divide-white/[0.06] rounded-xl border border-white/[0.06] bg-card/40">
-        <Stat value={formatNumberFull(s.totalQueriesAllTime)} label="queries settled" />
-        <Stat value={formatUsdcCompact(s.cumulativeVolumeUsdc)} label="USDC paid" accent />
-        <Stat value={formatNumberFull(s.tracesAnchored)} label="traces anchored" />
+      <div
+        className={`mt-8 grid w-full divide-x divide-white/[0.06] rounded-xl border border-white/[0.06] bg-card/40 ${
+          tiles.length === 4 ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-3"
+        }`}
+      >
+        {tiles.map((t) => (
+          <Stat key={t.label} value={t.value} label={t.label} accent={t.accent} />
+        ))}
       </div>
 
       <a
