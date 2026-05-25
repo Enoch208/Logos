@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { ArrowUpRight01Icon, Search01Icon } from "hugeicons-react";
 import { SEED_SPECIALISTS } from "@/data/mockData";
 import { EyebrowLabel } from "@/components/ui/EyebrowLabel";
@@ -35,7 +36,7 @@ export function SpecialistDirectory() {
           <Pill tone="accent" mono>
             permissionless
           </Pill>
-          <a
+          <Link
             href="/dashboard/specialists"
             className="group inline-flex cursor-pointer items-center gap-1.5 text-sm font-medium text-foreground transition-colors hover:text-accent"
           >
@@ -45,7 +46,7 @@ export function SpecialistDirectory() {
               strokeWidth={1.5}
               className="text-muted transition-all group-hover:text-accent group-hover:translate-x-0.5"
             />
-          </a>
+          </Link>
         </div>
       </div>
 
