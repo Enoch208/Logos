@@ -5,6 +5,7 @@ import pytest
 
 from specialists.onchain_dex_data.main import _map_dexscreener
 from specialists.polymarket_structurer.main import _best_market, _map_market
+from specialists.risk_checker.main import _liq_prob, _slippage_band
 
 
 def test_dex_picks_deepest_liquidity_pair() -> None:
@@ -60,3 +61,17 @@ def test_gamma_best_market_keyword_match() -> None:
 def test_gamma_best_market_none_when_no_overlap() -> None:
     markets = [{"question": "Will it rain?", "liquidity": 1, "conditionId": "0x2", "outcomes": '["Yes","No"]'}]
     assert _best_market(markets, "monetary policy inflation") is None
+
+
+# --- risk_checker → live liquidity ---
+
+
+def test_risk_slippage_band_from_liquidity_and_size() -> None:
+    assert _slippage_band(100_000_000, 1_000) == "LOW"     # tiny trade, deep pool
+    assert _slippage_band(1_000_000, 20_000) == "HIGH"     # ~2% of pool
+    assert _slippage_band(100_000, 50_000) == "EXTREME"    # 50% of pool
+    assert _slippage_band(0, 1_000) == "EXTREME"           # no liquidity
+
+
+def test_risk_liq_prob_scales_with_leverage() -> None:
+    assert _liq_prob(1) < _liq_prob(5) < _liq_prob(20)
