@@ -53,6 +53,10 @@ export interface MarketplaceSummary {
   tracesAnchored: number;
   totalQueriesAllTime: number;
   externalAgentsIntegrated: number;
+  // Distinct trader wallets that have queried the marketplace, and how many of
+  // those are external (not Atlas / our own fleet) — the adoption signal.
+  distinctWallets: number;
+  externalWallets: number;
 }
 
 export interface MarketOffer {

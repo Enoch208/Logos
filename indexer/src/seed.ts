@@ -151,6 +151,8 @@ export const SEED_SUMMARY: MarketplaceSummary = {
   tracesAnchored: 0,
   totalQueriesAllTime: 0,
   externalAgentsIntegrated: 0,
+  distinctWallets: 0,
+  externalWallets: 0,
 };
 
 export const SEED_ATLAS_TRACE: CompositionTrace = {

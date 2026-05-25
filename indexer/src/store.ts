@@ -57,6 +57,29 @@ export function resolveTraceCid(queryId: string, fallback: string): string {
   return traceCidByQuery.get(queryId.toLowerCase()) ?? fallback;
 }
 
+// Distinct trader wallets that have queried the marketplace (fed only by real
+// recordTransaction calls / chain backfill, never the static seed). "Internal"
+// = Atlas + our own fleet key; everything else is external adoption. Override
+// the internal set with INTERNAL_TRADERS (comma-separated) if keys change.
+const INTERNAL_TRADERS = new Set(
+  (
+    process.env.INTERNAL_TRADERS ??
+    "0xf87bed27ede71fa644cd593d026728e583804b78," +
+      "0x339fdb1ff1a79151ba4536c58896a03b79abb6be," +
+      "0x_atlas_trader.eth"
+  )
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean),
+);
+const distinctTraders = new Set<string>();
+
+function countWallets(): { distinctWallets: number; externalWallets: number } {
+  let external = 0;
+  for (const t of distinctTraders) if (!INTERNAL_TRADERS.has(t)) external += 1;
+  return { distinctWallets: distinctTraders.size, externalWallets: external };
+}
+
 // Per-specialist tallies start at zero and count only real RATED queries — the
 // directory + leaderboard reflect genuine settled activity, never a seed.
 const specialistTotals = new Map<string, { queries: number; earned: number }>();
@@ -114,7 +137,7 @@ export function getSummary(): MarketplaceSummary {
       .filter((t) => t.status === "RATED" && Date.parse(t.timestamp) >= hourAgo)
       .map((t) => t.id),
   ).size;
-  return { ...memory.state.summary, queriesLastHour };
+  return { ...memory.state.summary, queriesLastHour, ...countWallets() };
 }
 
 export function getAtlas(): CompositionTrace {
@@ -135,6 +158,7 @@ export async function getRecentTransactions(limit = 30): Promise<AgentTransactio
 
 export async function recordTransaction(tx: AgentTransaction): Promise<void> {
   bumpSpecialistTotals(tx);
+  if (tx.traderId) distinctTraders.add(tx.traderId.toLowerCase());
   memory.state.transactions = [tx, ...memory.state.transactions].slice(0, MAX_FEED);
   // Count each query exactly once: a trace is anchored at ATTESTED; volume +
   // the query itself are booked at RATED (settled). A query streams as three
