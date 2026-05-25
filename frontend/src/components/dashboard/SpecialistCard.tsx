@@ -1,3 +1,4 @@
+import Link from "next/link";
 import {
   ArrowUpRight01Icon,
   CheckmarkCircle02Icon,
@@ -29,7 +30,9 @@ type Props = {
 export function SpecialistCard({ agent }: Props) {
   const label = SERVICE_LABEL[agent.serviceType] ?? agent.serviceType;
   return (
-    <article className="group relative flex flex-col gap-4 rounded-xl border border-white/5 bg-[#0B0C0E] p-5 transition-all duration-200 ease-out hover:-translate-y-px hover:border-white/10 hover:bg-white/[0.015]">
+    <Link
+      href={`/dashboard/specialists/${agent.name}`}
+      className="group relative flex cursor-pointer flex-col gap-4 rounded-xl border border-white/5 bg-[#0B0C0E] p-5 transition-all duration-200 ease-out hover:-translate-y-px hover:border-white/10 hover:bg-white/[0.015]">
       <header className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
@@ -108,6 +111,6 @@ export function SpecialistCard({ agent }: Props) {
           {agent.id.slice(0, 10)}…
         </span>
       </footer>
-    </article>
+    </Link>
   );
 }
