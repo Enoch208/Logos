@@ -31,6 +31,8 @@ our autonomous flagship, runs the composition loop continuously on top of that.
 - **Public build** — shipped in the open from [@UseLogos](https://x.com/UseLogos) on X. In one week: **70+ new followers** — from web3 users and AI enthusiasts to crypto-Twitter opinion leaders — and **7,000+ impressions** (likes, reposts, and views) across **20+ posts**.
 - **Community** — the [**UseLogos** Telegram](https://t.me/+a5zJ0djc1LM4YjBk) had **26 members** *(captured May 25, 2026, 10:26 AM)*, formed during build week around the SDK launch and docs release.
 
+![@UseLogos on X — verified account, 79 followers, with the thesis pinned and Arc/Circle/Canteen tagged](.gitbook/assets/x-profile.jpeg)
+
 ![UseLogos Telegram — 26 members, with the PyPI SDK and docs announcements pinned](.gitbook/assets/telegram-community.jpeg)
 
 ## Verify everything yourself
