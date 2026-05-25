@@ -1,84 +1,71 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { WS_URL, type WsMessage } from "@/lib/api";
+import { api, WS_URL, type WsMessage } from "@/lib/api";
 import type { AgentTransaction } from "@/data/mockData";
 
 type Status = "connecting" | "open" | "closed" | "fallback";
+
+const POLL_MS = 10_000;
 
 export function useLiveFeed(seed: AgentTransaction[], maxRows = 14) {
   const [rows, setRows] = useState<AgentTransaction[]>(seed);
   const [status, setStatus] = useState<Status>("connecting");
   const [mode, setMode] = useState<"chain" | "mock" | "client-mock">("mock");
   const wsRef = useRef<WebSocket | null>(null);
-  const fallbackRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     let cancelled = false;
 
-    const startClientFallback = () => {
-      if (fallbackRef.current) return;
-      setStatus("fallback");
-      setMode("client-mock");
-      fallbackRef.current = setInterval(() => {
-        if (cancelled) return;
-        const base = seed[Math.floor(Math.random() * seed.length)];
-        if (!base) return;
-        const tx: AgentTransaction = {
-          ...base,
-          id: `0x${Math.random().toString(16).slice(2, 14)}...${Math.random()
-            .toString(16)
-            .slice(2, 6)}`,
-          timestamp: new Date().toISOString(),
-        };
-        setRows((prev) => [tx, ...prev].slice(0, maxRows));
-      }, 2400);
-    };
+    // Primary source of truth: the indexer's REST feed. This replaces the
+    // static seed with real on-chain rows on mount and resyncs on a slow poll;
+    // the WebSocket below only prepends new rows instantly between polls.
+    const load = () =>
+      api
+        .transactions(maxRows)
+        .then((txs) => {
+          if (cancelled || txs.length === 0) return;
+          setRows(txs.slice(0, maxRows));
+        })
+        .catch(() => {});
+    load();
+    const poll = setInterval(load, POLL_MS);
 
     try {
       const ws = new WebSocket(WS_URL);
       wsRef.current = ws;
-
-      const failTimer = setTimeout(() => {
-        if (ws.readyState !== WebSocket.OPEN) {
-          ws.close();
-          startClientFallback();
-        }
-      }, 2500);
-
       ws.onopen = () => {
-        clearTimeout(failTimer);
-        if (cancelled) return;
-        setStatus("open");
+        if (!cancelled) setStatus("open");
       };
       ws.onmessage = (event) => {
         if (cancelled) return;
         try {
           const msg = JSON.parse(event.data) as WsMessage;
           if (msg.type === "tx") {
-            setRows((prev) => [msg.payload, ...prev].slice(0, maxRows));
+            setRows((prev) =>
+              prev.some((t) => t.id === msg.payload.id && t.status === msg.payload.status)
+                ? prev
+                : [msg.payload, ...prev].slice(0, maxRows),
+            );
           } else if (msg.type === "hello") {
             setMode(msg.payload.mode);
           }
-        } catch {}
+        } catch {
+          /* ignore malformed frames */
+        }
       };
       ws.onclose = () => {
-        if (cancelled) return;
-        setStatus("closed");
-        startClientFallback();
+        if (!cancelled) setStatus("closed");
       };
-      ws.onerror = () => {
-        if (cancelled) return;
-        ws.close();
-      };
+      ws.onerror = () => ws.close();
     } catch {
-      startClientFallback();
+      /* REST polling keeps the feed live even without a socket */
     }
 
     return () => {
       cancelled = true;
+      clearInterval(poll);
       wsRef.current?.close();
-      if (fallbackRef.current) clearInterval(fallbackRef.current);
     };
   }, [seed, maxRows]);
 
