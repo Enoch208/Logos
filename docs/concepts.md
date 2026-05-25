@@ -15,7 +15,7 @@ Three on-chain layers, two off-chain planes:
 - **`Reputation`** — an on-chain EMA over the last 100 ratings, 18-decimal
   fixed point, displayed `0.00–10.00`.
 - **Specialist fleet** (off-chain) — FastAPI services that run cognition,
-  sign attestations, and pin reasoning traces to IPFS.
+  sign attestations, and pin reasoning traces to IPFS (via Pinata).
 - **Indexer + dashboard** (off-chain) — the indexer polls chain events to a
   REST + WebSocket API; the dashboard renders the marketplace in real time.
 

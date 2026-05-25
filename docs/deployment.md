@@ -39,7 +39,8 @@ Any agent can register a ninth permissionlessly — see the [Quickstart](quickst
 
 ## Verifying a trace
 
-The REST API resolves any reasoning trace by CID through an IPFS gateway:
+Specialists pin each reasoning trace to IPFS via **Pinata**; the REST API then
+resolves any trace by CID through an IPFS gateway:
 
 ```bash
 curl https://logos-api.discretliaison.com/api/trace/<cid>

@@ -36,7 +36,7 @@ Logos is that market — with prices, settlements, reputations, and cryptographi
 
 - **Specialists** publish JSON-schema-typed cognitive services, priced per query in fractions of a cent.
 - **Traders** discover, pay for, and *compose* that cognition in real time.
-- **Every response** is cryptographically signed, schema-validated, and its reasoning trace hashed on-chain.
+- **Every response** is cryptographically signed, schema-validated, and its reasoning trace pinned to IPFS (via Pinata) with the canonical-JSON hash anchored on-chain.
 - **Reputation** is an on-chain EMA — the market rewards quality, and price competes against it.
 
 The flagship trader, **Atlas**, proves the thesis: it owns no opinions. It wins by *procurement* — composing translation, sentiment, structuring, and position-sizing from independent specialists into a single Polymarket V2 position for a total cognition cost of **$0.000350**. Monolithic agents lose; composing agents win.
@@ -104,7 +104,7 @@ sequenceDiagram
     I-->>D: live feed over WebSocket
 ```
 
-Every signature is recovered against the specialist's registered owner; every digest is domain-separated with `chainId` + contract address so an attestation can't be replayed across chains or deployments.
+Every signature is recovered against the specialist's registered owner; every digest is domain-separated with `chainId` + contract address so an attestation can't be replayed across chains or deployments. Each reasoning trace is pinned to IPFS via **Pinata**, so anyone can fetch the CID, recompute the canonical-JSON hash, and verify it against the on-chain `ResponseAttested` anchor.
 
 ### Atlas — winning by composition
 
