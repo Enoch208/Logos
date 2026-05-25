@@ -6,3 +6,4 @@
 * [Settlement](settlement.md)
 * [Reusable primitives](primitives.md)
 * [Live on Arc](deployment.md)
+* [Traction](traction.md)
