@@ -151,7 +151,7 @@ export function DashboardSidebar() {
 
   return (
     <>
-      <aside className="hidden lg:flex h-screen sticky top-0 w-[240px] shrink-0 flex-col border-r border-white/5 bg-[#0F1012]">
+      <aside className="hidden lg:flex h-full w-[240px] shrink-0 flex-col border-r border-white/5 bg-[#0F1012]">
         <SidebarHeader />
         <NavInner pathname={pathname} />
       </aside>

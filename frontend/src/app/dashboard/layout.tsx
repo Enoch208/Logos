@@ -18,11 +18,14 @@ export default function DashboardLayout({
   return (
     <Web3Provider>
       <DashboardNavProvider>
-        <div className="flex min-h-screen w-full bg-canvas text-foreground">
+        {/* App-shell: the frame is exactly viewport height and only <main>
+            scrolls, so the sidebar + topbar stay static (and it's immune to the
+            global `overflow-x: hidden` that otherwise breaks position: sticky). */}
+        <div className="flex h-screen w-full overflow-hidden bg-canvas text-foreground">
           <DashboardSidebar />
-          <div className="flex min-w-0 flex-1 flex-col">
+          <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
             <DashboardTopbar />
-            <main className="flex-1">{children}</main>
+            <main className="flex-1 overflow-y-auto">{children}</main>
           </div>
         </div>
       </DashboardNavProvider>
