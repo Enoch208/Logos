@@ -73,6 +73,13 @@ const INTERNAL_TRADERS = new Set(
     .filter(Boolean),
 );
 const distinctTraders = new Set<string>();
+const EVM_ADDRESS = /^0x[0-9a-f]{40}$/i;
+
+function trackTrader(traderId: string | undefined): void {
+  if (traderId && EVM_ADDRESS.test(traderId)) {
+    distinctTraders.add(traderId.toLowerCase());
+  }
+}
 
 function countWallets(): { distinctWallets: number; externalWallets: number } {
   let external = 0;
@@ -109,12 +116,20 @@ export async function initStore(): Promise<{ kind: "mongo" | "memory" }> {
     await mongoClient.connect();
     const db: Db = mongoClient.db(config.mongoDb);
     txCollection = db.collection<AgentTransaction>("transactions");
-    await txCollection.createIndex({ id: 1 }, { unique: true });
+    // A query legitimately produces one row at each lifecycle status.
+    // Migrate the original id-only uniqueness constraint, which dropped the
+    // ATTESTED/RATED rows after persisting the initial ESCROWED event.
+    await txCollection.dropIndex("id_1").catch(() => {});
+    await txCollection.createIndex({ id: 1, status: 1 }, { unique: true });
     await txCollection.createIndex({ timestamp: -1 });
     const count = await txCollection.estimatedDocumentCount();
     if (count === 0 && SEED_TRANSACTIONS.length > 0) {
       await txCollection.insertMany(SEED_TRANSACTIONS, { ordered: false });
     }
+    // Restore wallet adoption from persisted on-chain rows after a restart.
+    // Legacy mock/seed identifiers are deliberately excluded by trackTrader.
+    const traders = await txCollection.distinct("traderId");
+    for (const trader of traders) trackTrader(trader);
     return { kind: "mongo" };
   } catch (err) {
     console.warn("[store] Mongo connect failed, using memory:", err);
@@ -158,7 +173,7 @@ export async function getRecentTransactions(limit = 30): Promise<AgentTransactio
 
 export async function recordTransaction(tx: AgentTransaction): Promise<void> {
   bumpSpecialistTotals(tx);
-  if (tx.traderId) distinctTraders.add(tx.traderId.toLowerCase());
+  trackTrader(tx.traderId);
   memory.state.transactions = [tx, ...memory.state.transactions].slice(0, MAX_FEED);
   // Count each query exactly once: a trace is anchored at ATTESTED; volume +
   // the query itself are booked at RATED (settled). A query streams as three

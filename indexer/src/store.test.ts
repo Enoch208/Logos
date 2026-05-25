@@ -56,6 +56,21 @@ describe("store", () => {
     expect(s.tracesAnchored).toBeGreaterThanOrEqual(0);
   });
 
+  it("counts only real EVM trader addresses as wallets", async () => {
+    const before = getSummary().distinctWallets;
+    await recordTransaction(tx({ id: "0xmock-wallet", traderId: "0x_external_demo.eth" }));
+    expect(getSummary().distinctWallets).toBe(before);
+
+    await recordTransaction(
+      tx({
+        id: "0xexternal-wallet",
+        traderId: "0x" + "12".repeat(20),
+      }),
+    );
+    expect(getSummary().distinctWallets).toBe(before + 1);
+    expect(getSummary().externalWallets).toBeGreaterThanOrEqual(1);
+  });
+
   it("recordTransaction prepends to the feed, newest first", async () => {
     const before = (await getRecentTransactions()).length;
     const fresh = tx({ id: "0xfreshest", status: "ATTESTED" });
