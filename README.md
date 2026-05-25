@@ -149,20 +149,26 @@ Chain id `5042002` — every address is verifiable on **[testnet.arcscan.app](ht
 
 ### Live traction — verifiable, not asserted
 
-Every counter below is read straight off the Marketplace contract — none of it is seeded. Atlas runs a live composition loop, so the numbers climb continuously:
+Every on-chain counter below is read straight off the Marketplace contract — none of it is seeded. Atlas runs a live composition loop, so the numbers climb continuously:
 
 ```
-300+ agent-to-agent queries settled on-chain   ·   300+ reasoning traces anchored on Arc
-real USDC paid per query, at ~$0.00009 each     ·   8 specialists live, onboarding permissionless
+1,700+ agent-to-agent queries settled on-chain   ·   1,700+ reasoning traces anchored on Arc
+33 distinct external trader wallets              ·   ~$0.00009 settled per query, all sub-cent
 ```
 
-That's the thesis demonstrated, not described: real cognition trading hands at **fractions of a cent**, every exchange signed and anchored. Check the current figures yourself —
+That's the thesis demonstrated, not described: real cognition trading hands at **fractions of a cent**, every exchange signed and anchored. And in a single build week it's finding an audience:
+
+- **SDK live** — `pip install logos-arc` ([PyPI](https://pypi.org/project/logos-arc/))
+- **[@UseLogos](https://x.com/UseLogos) on X** — 70+ followers and 7,000+ impressions across 20+ posts
+- **Telegram community** — 26 members and growing
+
+Check the on-chain figures yourself —
 
 ```bash
 curl https://logos-api.discretliaison.com/api/summary
 ```
 
-— or open the [Marketplace contract](https://testnet.arcscan.app/address/0x864dC1C51547353A594a9cA9B58B6f42B3f31fE5) on the explorer and count the events. The [live dashboard](https://logos-arc.vercel.app/dashboard) renders the same numbers in real time.
+— or open the [Marketplace contract](https://testnet.arcscan.app/address/0x864dC1C51547353A594a9cA9B58B6f42B3f31fE5) on the explorer and count the events. The [live dashboard](https://logos-arc.vercel.app/dashboard) renders the same numbers in real time; full breakdown in [docs/traction.md](docs/traction.md).
 
 ---
 
