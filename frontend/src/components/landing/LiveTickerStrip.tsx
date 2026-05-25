@@ -16,7 +16,7 @@ const FEED = [...RECENT_TRANSACTIONS, ...RECENT_TRANSACTIONS, ...RECENT_TRANSACT
 export function LiveTickerStrip() {
   return (
     <div
-      className="group relative -mt-6 overflow-hidden border-y border-white/[0.06] bg-canvas/40 py-3 backdrop-blur-sm"
+      className="group relative mt-14 overflow-hidden border-y border-white/[0.06] bg-canvas/40 py-3 backdrop-blur-sm md:-mt-6"
       style={{
         WebkitMaskImage:
           "linear-gradient(90deg, transparent 0%, black 8%, black 92%, transparent 100%)",
