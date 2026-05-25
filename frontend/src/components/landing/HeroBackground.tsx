@@ -19,11 +19,23 @@ export function HeroBackground() {
           "linear-gradient(180deg, transparent 0%, black 0%, black 80%, transparent 100%)",
         WebkitMaskImage:
           "linear-gradient(180deg, transparent 0%, black 0%, black 80%, transparent 100%)",
+        // Keep the filtered canvas on its own GPU layer so its repaints don't
+        // invalidate the hero content above it (the flicker / disappearing).
+        transform: "translateZ(0)",
+        contain: "paint",
       }}
     >
       <div
         data-us-project={PROJECT_ID}
         data-alpha-mask="80"
+        // Render at half resolution / 1x DPI / 30fps and only while in view —
+        // imperceptible under the blur + mask, but cuts the per-frame composite
+        // cost several-fold so scrolling stays smooth. Pure render-fidelity
+        // knobs; the design is unchanged.
+        data-us-scale="0.5"
+        data-us-dpi="1"
+        data-us-fps="30"
+        data-us-lazyload="true"
         className="absolute inset-0"
       />
       <Script id="hero-bg-loader" strategy="afterInteractive">
