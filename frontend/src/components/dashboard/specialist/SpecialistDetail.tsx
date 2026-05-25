@@ -26,7 +26,22 @@ export function SpecialistDetail({ name }: { name: string }) {
     const clock = setInterval(() => setNowMs(Date.now()), 1000);
     let alive = true;
     const load = () => {
-      api.specialists().then((n) => alive && n.length > 0 && setSpecialists(n)).catch(() => {});
+      api
+        .specialists()
+        .then((n) => {
+          if (!alive || n.length === 0) return;
+          // The on-chain offer stores only the schema *hash*, so the live API
+          // returns schema:{}. Backfill the canonical schema by name from seed.
+          const seedSchema = new Map(SEED_SPECIALISTS.map((s) => [s.name, s.schema]));
+          setSpecialists(
+            n.map((s) =>
+              s.schema && Object.keys(s.schema).length > 0
+                ? s
+                : { ...s, schema: seedSchema.get(s.name) ?? s.schema },
+            ),
+          );
+        })
+        .catch(() => {});
       api.transactions(80).then((n) => alive && setTxns(n)).catch(() => {});
     };
     load();
