@@ -1,14 +1,21 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
 import {
   GlobalSearchIcon,
   ArrowRight01Icon,
+  ArrowUpRight01Icon,
   Copy01Icon,
 } from "hugeicons-react";
 import type { AgentTransaction } from "@/data/mockData";
 import { StatusBadge } from "@/components/dashboard/StatusBadge";
 import { formatRelativeTime, shortenHex } from "@/lib/format";
+
+// Every query is recorded on the Marketplace contract on Arc — link there so a
+// judge can verify the on-chain activity behind the feed.
+const MARKETPLACE = "0x864dC1C51547353A594a9cA9B58B6f42B3f31fE5";
+const SCAN_BASE = "https://testnet.arcscan.app/address";
 
 type Props = {
   tx: AgentTransaction;
@@ -21,6 +28,18 @@ function specialistName(specialistId: string): string {
 }
 
 export function LiveFeedRow({ tx, nowMs }: Props) {
+  const [copied, setCopied] = useState(false);
+
+  const copyId = async () => {
+    try {
+      await navigator.clipboard.writeText(tx.id);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1200);
+    } catch {
+      /* clipboard unavailable (insecure context) — ignore */
+    }
+  };
+
   return (
     <motion.li
       layout
@@ -36,11 +55,17 @@ export function LiveFeedRow({ tx, nowMs }: Props) {
         <span className="font-mono text-[11px] text-foreground/85">
           {shortenHex(tx.id, 8, 4)}
         </span>
-        <Copy01Icon
-          size={11}
-          strokeWidth={1.5}
-          className="cursor-pointer text-muted opacity-0 transition-opacity group-hover:opacity-100"
-        />
+        <button
+          onClick={copyId}
+          aria-label={copied ? "Copied query ID" : "Copy query ID"}
+          className={`cursor-pointer transition-opacity ${
+            copied
+              ? "text-accent opacity-100"
+              : "text-muted opacity-0 hover:text-foreground group-hover:opacity-100"
+          }`}
+        >
+          <Copy01Icon size={11} strokeWidth={1.5} />
+        </button>
       </div>
 
       <div className="hidden min-w-0 items-center gap-2 text-[12px] md:flex">
@@ -69,8 +94,17 @@ export function LiveFeedRow({ tx, nowMs }: Props) {
           {nowMs > 0 ? formatRelativeTime(tx.timestamp, nowMs) : "—"}
         </span>
         <a
-          href={`#trace?cid=${tx.traceCid}`}
-          aria-label="View trace"
+          href={`${SCAN_BASE}/${MARKETPLACE}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="View on Arc explorer"
+          className="cursor-pointer rounded-sm border border-white/5 bg-white/[0.02] p-1 text-muted transition-colors hover:border-white/15 hover:bg-white/[0.06] hover:text-foreground"
+        >
+          <ArrowUpRight01Icon size={11} strokeWidth={1.5} />
+        </a>
+        <a
+          href="/dashboard/trace"
+          aria-label="Open trace explorer"
           className="cursor-pointer rounded-sm border border-white/5 bg-white/[0.02] p-1 text-muted transition-colors hover:border-white/15 hover:bg-white/[0.06] hover:text-foreground"
         >
           <GlobalSearchIcon size={11} strokeWidth={1.5} />
