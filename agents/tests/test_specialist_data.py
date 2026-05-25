@@ -6,6 +6,7 @@ import pytest
 from specialists.onchain_dex_data.main import _map_dexscreener
 from specialists.polymarket_structurer.main import _best_market, _map_market
 from specialists.risk_checker.main import _liq_prob, _slippage_band
+from specialists.whale_tracker_eth.main import _map_whales
 
 
 def test_dex_picks_deepest_liquidity_pair() -> None:
@@ -75,3 +76,28 @@ def test_risk_slippage_band_from_liquidity_and_size() -> None:
 
 def test_risk_liq_prob_scales_with_leverage() -> None:
     assert _liq_prob(1) < _liq_prob(5) < _liq_prob(20)
+
+
+# --- whale_tracker_eth → Etherscan ---
+
+
+def test_whales_aggregates_window_transfers() -> None:
+    now = 1_000_000
+    transfers = [
+        {"timeStamp": str(now - 60), "value": str(50 * 10**18), "tokenDecimal": "18", "from": "0x" + "a" * 40, "to": "0x" + "b" * 40, "tokenSymbol": "WETH"},
+        {"timeStamp": str(now - 120), "value": str(5 * 10**18), "tokenDecimal": "18", "from": "0x" + "c" * 40, "to": "0x" + "d" * 40, "tokenSymbol": "WETH"},
+        {"timeStamp": str(now - 180), "value": str(1 * 10**18), "tokenDecimal": "18", "from": "0x" + "e" * 40, "to": "0x" + "f" * 40, "tokenSymbol": "WETH"},
+        {"timeStamp": str(now - 200), "value": str(2 * 10**18), "tokenDecimal": "18", "from": "0x" + "1" * 40, "to": "0x" + "2" * 40, "tokenSymbol": "WETH"},
+    ]
+    out = _map_whales(transfers, now)
+    assert out["active_whale_wallets"] >= 2
+    assert "WETH" in out["net_flow_30m"]
+
+
+def test_whales_excludes_outside_window() -> None:
+    now = 1_000_000
+    transfers = [
+        {"timeStamp": str(now - 5000), "value": str(10**18), "tokenDecimal": "18", "from": "0xa", "to": "0xb", "tokenSymbol": "WETH"}
+    ]
+    with pytest.raises(ValueError):
+        _map_whales(transfers, now)
