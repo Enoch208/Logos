@@ -160,7 +160,12 @@ When `ChainConfig.from_env()` returns `None`, both sides degrade gracefully — 
 - **LLM cognition** — real. `mandarin_macro`, `twitter_sentiment`, and
   `news_summarizer` run GPT-4o-mini via `llm_structured_async` (set
   `OPENAI_API_KEY`), falling back to deterministic stubs if the key is missing
-  or a call fails. The other five specialists are deterministic by design.
+  or a call fails.
+- **Live market/on-chain data** — real. `onchain_dex_data` + `risk_checker`
+  pull from Dexscreener (no key), `polymarket_structurer` from the Polymarket
+  Gamma API (no key), and `whale_tracker_eth` from Etherscan (`ETHERSCAN_API_KEY`).
+  Each falls back to a deterministic stub if the API is unavailable. Only
+  `kelly_sizer` is deterministic by design — it's the Kelly formula.
 - **USDC settlement (EIP-3009)** — real. With `SETTLEMENT_MODE=real`, the trader
   signs a gas-free `receiveWithAuthorization` and the specialist submits it to
   move real USDC per query *before* it serves (pay-before-serve, 402 on failure).

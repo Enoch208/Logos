@@ -136,16 +136,16 @@ Chain id `5042002` — every address is verifiable on **[testnet.arcscan.app](ht
 
 ### The 8 seed specialists
 
-| Specialist | Service | Price | Cognition |
+| Specialist | Service | Price | Powered by |
 | --- | --- | --- | --- |
 | `mandarin_macro` | translation | $0.000150 | GPT-4o-mini |
 | `twitter_sentiment` | market sentiment | $0.000080 | GPT-4o-mini |
 | `news_summarizer` | news summarization | $0.000100 | GPT-4o-mini |
-| `polymarket_structurer` | market structuring | $0.000050 | deterministic |
+| `polymarket_structurer` | market structuring | $0.000050 | Polymarket Gamma API |
 | `kelly_sizer` | capital allocation | $0.000070 | Kelly criterion |
-| `risk_checker` | risk evaluation | $0.000120 | deterministic |
-| `whale_tracker_eth` | whale tracking | $0.000300 | deterministic |
-| `onchain_dex_data` | DEX telemetry | $0.000250 | deterministic |
+| `risk_checker` | risk evaluation | $0.000120 | Dexscreener liquidity |
+| `whale_tracker_eth` | whale tracking | $0.000300 | Etherscan |
+| `onchain_dex_data` | DEX telemetry | $0.000250 | Dexscreener |
 
 ---
 
@@ -229,7 +229,7 @@ With no contracts deployed the indexer runs in `mock` mode and the feed still an
 Resilience is built into every layer — a demo that breaks under load isn't a demo:
 
 - **Indexer** uses stateless block-cursor `eth_getLogs` polling, not RPC filters — it survives filter expiry, RPC failover, and its own restarts (it backfills on boot).
-- **Specialists** fall back to deterministic stubs if the LLM is unavailable, so the marketplace never stops responding.
+- **Specialists** fall back to deterministic stubs if the LLM or a data API (Dexscreener, Polymarket Gamma, Etherscan) is unavailable, so the marketplace never stops responding.
 - **Dashboard** falls back to an in-browser stream if the indexer is unreachable — the feed never shows an empty screen.
 - **Signatures** are domain-separated against `chainId` + contract address — no cross-chain replay.
 

@@ -24,16 +24,16 @@ Every address is verifiable on **[testnet.arcscan.app](https://testnet.arcscan.a
 
 ## The 8 seed specialists
 
-| Specialist | Service | Price | Cognition |
+| Specialist | Service | Price | Powered by |
 | --- | --- | --- | --- |
 | `mandarin_macro` | translation | $0.000150 | GPT-4o-mini |
 | `twitter_sentiment` | market sentiment | $0.000080 | GPT-4o-mini |
 | `news_summarizer` | news summarization | $0.000100 | GPT-4o-mini |
-| `polymarket_structurer` | market structuring | $0.000050 | deterministic |
+| `polymarket_structurer` | market structuring | $0.000050 | Polymarket Gamma API |
 | `kelly_sizer` | capital allocation | $0.000070 | Kelly criterion |
-| `risk_checker` | risk evaluation | $0.000120 | deterministic |
-| `whale_tracker_eth` | whale tracking | $0.000300 | deterministic |
-| `onchain_dex_data` | DEX telemetry | $0.000250 | deterministic |
+| `risk_checker` | risk evaluation | $0.000120 | Dexscreener liquidity |
+| `whale_tracker_eth` | whale tracking | $0.000300 | Etherscan |
+| `onchain_dex_data` | DEX telemetry | $0.000250 | Dexscreener |
 
 Any agent can register a ninth permissionlessly — see the [Quickstart](quickstart.md).
 
