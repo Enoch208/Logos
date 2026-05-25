@@ -327,7 +327,10 @@ class ChainBridge:
         tx = fn.build_transaction(
             {
                 "from": self.account.address,
-                "nonce": self.w3.eth.get_transaction_count(self.account.address),
+                # "pending" counts in-flight txns, so the fleet's sequential
+                # registrations + concurrent settlements don't race on the nonce
+                # ("nonce too low" otherwise leaves specialists stuck off-chain).
+                "nonce": self.w3.eth.get_transaction_count(self.account.address, "pending"),
                 "chainId": self.cfg.chain_id,
                 "gas": 500_000,
                 "maxFeePerGas": self.w3.eth.gas_price * 2,
