@@ -50,8 +50,9 @@ describe("store", () => {
   it("seeds the marketplace summary with the expected shape", () => {
     const s = getSummary();
     expect(s.activeSpecialists).toBe(8);
-    expect(s.cumulativeVolumeUsdc).toBeGreaterThan(0);
-    expect(s.tracesAnchored).toBeGreaterThan(0);
+    // Counters start at zero — they only reflect real settled activity.
+    expect(s.cumulativeVolumeUsdc).toBeGreaterThanOrEqual(0);
+    expect(s.tracesAnchored).toBeGreaterThanOrEqual(0);
   });
 
   it("recordTransaction prepends to the feed, newest first", async () => {
@@ -63,26 +64,32 @@ describe("store", () => {
     expect(after[0]?.id).toBe("0xfreshest");
   });
 
-  it("recordTransaction bumps cumulative volume by costUsdc", async () => {
+  it("books cumulative volume once per query, at RATED", async () => {
     const baseline = getSummary().cumulativeVolumeUsdc;
-    await recordTransaction(tx({ costUsdc: 0.001234 }));
-    const after = getSummary().cumulativeVolumeUsdc;
-    expect(after).toBeCloseTo(baseline + 0.001234, 8);
+    // Non-settled rows don't move volume…
+    await recordTransaction(tx({ id: "0xvol-a", status: "ATTESTED", costUsdc: 0.001234 }));
+    expect(getSummary().cumulativeVolumeUsdc).toBeCloseTo(baseline, 8);
+    // …only the settled (RATED) row does.
+    await recordTransaction(tx({ id: "0xvol-b", status: "RATED", costUsdc: 0.001234 }));
+    expect(getSummary().cumulativeVolumeUsdc).toBeCloseTo(baseline + 0.001234, 8);
   });
 
-  it("recordTransaction increments tracesAnchored only on ATTESTED/RATED", async () => {
-    const summary = getSummary();
-    const startTraces = summary.tracesAnchored;
-    const startQueries = summary.totalQueriesAllTime;
+  it("counts each query once — trace at ATTESTED, query+volume at RATED", async () => {
+    const start = getSummary();
+    const startTraces = start.tracesAnchored;
+    const startQueries = start.totalQueriesAllTime;
 
-    await recordTransaction(tx({ status: "ESCROWED" }));
+    await recordTransaction(tx({ id: "0xq-esc", status: "ESCROWED" }));
     expect(getSummary().tracesAnchored).toBe(startTraces);
-    expect(getSummary().totalQueriesAllTime).toBe(startQueries + 1);
+    expect(getSummary().totalQueriesAllTime).toBe(startQueries);
 
-    await recordTransaction(tx({ status: "ATTESTED" }));
-    await recordTransaction(tx({ status: "RATED" }));
-    expect(getSummary().tracesAnchored).toBe(startTraces + 2);
-    expect(getSummary().totalQueriesAllTime).toBe(startQueries + 3);
+    await recordTransaction(tx({ id: "0xq-att", status: "ATTESTED" }));
+    expect(getSummary().tracesAnchored).toBe(startTraces + 1);
+    expect(getSummary().totalQueriesAllTime).toBe(startQueries);
+
+    await recordTransaction(tx({ id: "0xq-rated", status: "RATED" }));
+    expect(getSummary().tracesAnchored).toBe(startTraces + 1);
+    expect(getSummary().totalQueriesAllTime).toBe(startQueries + 1);
   });
 
   it("getRecentTransactions respects the limit param", async () => {

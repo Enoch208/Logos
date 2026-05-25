@@ -372,13 +372,15 @@ export interface MarketplaceSummary {
   externalAgentsIntegrated: number;
 }
 
+// Honest fallback: zeroed so the dashboard never shows seeded volume before the
+// live indexer summary loads. Real counters come from /api/summary.
 export const MARKETPLACE_SUMMARY: MarketplaceSummary = {
-  cumulativeVolumeUsdc: 18.7894,
+  cumulativeVolumeUsdc: 0,
   activeSpecialists: 8,
-  queriesLastHour: 141,
-  tracesAnchored: 421,
-  totalQueriesAllTime: 161399,
-  externalAgentsIntegrated: 4,
+  queriesLastHour: 0,
+  tracesAnchored: 0,
+  totalQueriesAllTime: 0,
+  externalAgentsIntegrated: 0,
 };
 
 export interface VolumeBucket {

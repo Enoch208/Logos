@@ -136,15 +136,18 @@ export async function getRecentTransactions(limit = 30): Promise<AgentTransactio
 export async function recordTransaction(tx: AgentTransaction): Promise<void> {
   bumpSpecialistTotals(tx);
   memory.state.transactions = [tx, ...memory.state.transactions].slice(0, MAX_FEED);
+  // Count each query exactly once: a trace is anchored at ATTESTED; volume +
+  // the query itself are booked at RATED (settled). A query streams as three
+  // rows (ESCROWED/ATTESTED/RATED), so without this the counters triple-count.
+  const s = memory.state.summary;
   memory.state.summary = {
-    ...memory.state.summary,
+    ...s,
     cumulativeVolumeUsdc:
-      memory.state.summary.cumulativeVolumeUsdc + tx.costUsdc,
-    totalQueriesAllTime: memory.state.summary.totalQueriesAllTime + 1,
+      tx.status === "RATED" ? s.cumulativeVolumeUsdc + tx.costUsdc : s.cumulativeVolumeUsdc,
+    totalQueriesAllTime:
+      tx.status === "RATED" ? s.totalQueriesAllTime + 1 : s.totalQueriesAllTime,
     tracesAnchored:
-      tx.status === "ATTESTED" || tx.status === "RATED"
-        ? memory.state.summary.tracesAnchored + 1
-        : memory.state.summary.tracesAnchored,
+      tx.status === "ATTESTED" ? s.tracesAnchored + 1 : s.tracesAnchored,
   };
   if (txCollection) {
     try {
