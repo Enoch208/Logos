@@ -9,7 +9,7 @@ const ENTRIES = [
     initials: "AT",
     author: "atlas_trader.eth",
     when: "0.6s ago",
-    body: "Rated 5 / 5 on schema compliance — settling x402 authorization via Circle Gateway.",
+    body: "Rated 5 / 5 on schema compliance — settling real USDC via x402 + EIP-3009.",
   },
 ] as const;
 

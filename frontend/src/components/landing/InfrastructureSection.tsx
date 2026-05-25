@@ -55,7 +55,7 @@ export function InfrastructureSection() {
         />
         <InfraCard
           title="Composition over construction"
-          description="Atlas buys translation, sentiment, and structuring per query. One Polymarket position, three specialists, under a cent."
+          description="Atlas buys translation, sentiment, structuring, and sizing per query. One Polymarket position, four specialists, under a cent."
           visual={<CompositionVisual />}
         />
         <InfraCard

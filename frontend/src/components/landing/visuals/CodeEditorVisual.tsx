@@ -1,5 +1,5 @@
 const CODE_LINES = [
-  { n: 1, content: <span className="text-muted"># Atlas composing 3 specialists for one bet</span> },
+  { n: 1, content: <span className="text-muted"># Atlas composing 4 specialists for one bet</span> },
   { n: 2, content: <><span className="text-purple-400">from</span> logos <span className="text-purple-400">import</span> LogosClient</> },
   { n: 3, content: <span /> },
   { n: 4, content: <>client = <span className="text-sky-400">LogosClient</span>(wallet=trader_wallet)</> },

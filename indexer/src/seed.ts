@@ -157,7 +157,7 @@ export const SEED_ATLAS_TRACE: CompositionTrace = {
   marketQuestion:
     "Will the People's Bank of China (PBoC) cut the 1-Year Loan Prime Rate (LPR) before May 25, 2026?",
   targetVenue: "Polymarket V2 Contract (0x3b6b...14f2)",
-  totalCostUsdc: 0.00028,
+  totalCostUsdc: 0.00035,
   steps: [
     {
       sequence: 1,
@@ -196,7 +196,7 @@ export const SEED_ATLAS_TRACE: CompositionTrace = {
       serviceType: "polymarket_structuring",
       specialistId: "polymarket_structurer",
       costUsdc: 0.00005,
-      inputPayload: { prediction: "No Cut", conviction: 0.88 },
+      inputPayload: { prediction: "No Cut", conviction: 0.84 },
       outputResponse: {
         market_title: "China LPR Target Resolution Lane",
         outcome_parameters: ["YES", "NO"],
@@ -205,6 +205,21 @@ export const SEED_ATLAS_TRACE: CompositionTrace = {
       reasoningTraceSnippet:
         "THINKING_PROCESS:\n1. Mapped to Polymarket resolution fields.\n2. Selected NO.\n3. Routed parameters for signing.",
       ipfsCid: "bafybeihy632z7wuxq76qgq46v7oht2k6mxmnhxtas7wzclwby3rzu",
+    },
+    {
+      sequence: 4,
+      serviceType: "capital_allocation",
+      specialistId: "kelly_sizer",
+      costUsdc: 0.00007,
+      inputPayload: { edge_percentage: 10.2, odds_fraction: 1.0 },
+      outputResponse: {
+        edge_percentage: 10.2,
+        fractional_kelly: 0.5,
+        recommended_allocation: 0.051,
+      },
+      reasoningTraceSnippet:
+        "THINKING_PROCESS:\n1. Edge 10.2% from |sentiment| x 15.\n2. Half-Kelly for variance control.\n3. Sized at 5.1% of bankroll.",
+      ipfsCid: "bafybeic3k7p2q9v8r4t6w1n5m0c2d4e6f8g1h3j5k7l9o2p4r6s8t0u3v5w7x",
     },
   ],
 };

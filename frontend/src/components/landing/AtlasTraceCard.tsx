@@ -27,7 +27,7 @@ export function AtlasTraceCard() {
             <span className="font-mono text-[11px] text-foreground">Atlas</span>
           </div>
           <div className="hidden items-center gap-4 font-mono text-[11px] text-muted sm:flex">
-            <span>composition · 3 specialists</span>
+            <span>composition · {t.steps.length} specialists</span>
             <span className="text-accent">
               total · ${t.totalCostUsdc.toFixed(6)} USDC
             </span>

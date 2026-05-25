@@ -40,11 +40,12 @@ describe("store", () => {
     expect(names).toContain("polymarket_structurer");
   });
 
-  it("seeds the Atlas composition trace with 3 steps", () => {
+  it("seeds the Atlas composition trace with 4 steps", () => {
     const atlas = getAtlas();
-    expect(atlas.steps).toHaveLength(3);
+    expect(atlas.steps).toHaveLength(4);
     expect(atlas.steps[0]?.specialistId).toBe("mandarin_macro");
-    expect(atlas.totalCostUsdc).toBeGreaterThan(0);
+    expect(atlas.steps[3]?.specialistId).toBe("kelly_sizer");
+    expect(atlas.totalCostUsdc).toBeCloseTo(0.00035, 8);
   });
 
   it("seeds the marketplace summary with the expected shape", () => {

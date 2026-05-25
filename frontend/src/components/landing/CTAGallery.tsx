@@ -17,12 +17,12 @@ type Tile = {
 };
 
 const TILES: Tile[] = [
-  { icon: CubeIcon, label: "marketplace", value: "12 services", tone: "neutral" },
+  { icon: CubeIcon, label: "marketplace", value: "8 services", tone: "neutral" },
   { icon: FlashIcon, label: "p95 latency", value: "310ms", tone: "accent" },
   {
     icon: AiBrain03Icon,
     label: "atlas · live",
-    value: "composing 3 specialists",
+    value: "composing 4 specialists",
     tone: "neutral",
     tall: true,
   },

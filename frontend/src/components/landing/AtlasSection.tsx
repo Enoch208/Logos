@@ -12,7 +12,7 @@ const PILLARS = [
   },
   {
     label: "Settlement",
-    title: "Three signed responses, one composed position",
+    title: "Four signed responses, one composed position",
     body:
       "Each specialist is paid in real USDC per query via Circle Nanopayments (EIP-3009). The full composition trace is hashed and anchored on Arc — verifiable from CID alone.",
   },
@@ -32,8 +32,8 @@ export function AtlasSection() {
         </h2>
         <p className="mt-6 max-w-2xl text-lg leading-relaxed text-muted">
           Atlas composes a Polymarket V2 position by buying cognition, not building it.
-          Three specialists handle translation, sentiment, and structuring. One
-          composition, under a cent.
+          Four specialists handle translation, sentiment, structuring, and sizing.
+          One composition, under a cent.
         </p>
         <div className="mt-8 inline-flex">
           <GhostButton
