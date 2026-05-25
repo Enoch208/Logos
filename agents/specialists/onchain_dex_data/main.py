@@ -1,14 +1,19 @@
 """onchain_dex_data — pair-level DEX telemetry: 24h volume + liquidity depth.
 
-v1 returns deterministic stubs per known pair. Real impl would query a
-subgraph or DEX router contract.
+Pulls live data from the Dexscreener public API (no key required); falls back
+to a deterministic stub if the API is unavailable so the marketplace never
+stalls.
 """
 
 from __future__ import annotations
 
 from typing import Any
 
+import httpx
+
 from logos.server import ReasoningTrace, Specialist, run
+
+DEXSCREENER = "https://api.dexscreener.com/latest/dex/tokens"
 
 SCHEMA: dict[str, Any] = {
     "type": "object",
@@ -50,6 +55,27 @@ def _telemetry(addr: str) -> dict[str, Any]:
     }
 
 
+def _map_dexscreener(data: dict[str, Any], addr: str) -> dict[str, Any]:
+    """Map a Dexscreener token response to our schema, picking the pair with
+    the deepest liquidity."""
+    pairs = data.get("pairs") or []
+    if not pairs:
+        raise ValueError("no pairs for token")
+    top = max(pairs, key=lambda p: float((p.get("liquidity") or {}).get("usd") or 0.0))
+    return {
+        "pair_address": top.get("pairAddress") or addr,
+        "volume_24h_usdc": float((top.get("volume") or {}).get("h24") or 0.0),
+        "liquidity_depth_usdc": float((top.get("liquidity") or {}).get("usd") or 0.0),
+    }
+
+
+async def _fetch_dex(addr: str) -> dict[str, Any]:
+    async with httpx.AsyncClient(timeout=6.0) as http:
+        resp = await http.get(f"{DEXSCREENER}/{addr}")
+        resp.raise_for_status()
+        return _map_dexscreener(resp.json(), addr)
+
+
 class OnchainDexData(Specialist):
     name = "onchain_dex_data"
     service_type = "dex_telemetry"
@@ -59,11 +85,21 @@ class OnchainDexData(Specialist):
     async def handle(
         self, payload: dict[str, Any], *, trace: ReasoningTrace
     ) -> dict[str, Any]:
-        addr = str(payload.get("pair_address", ""))
-        trace.step(f"Resolving pair telemetry for {addr or '<unspecified>'}")
+        addr = str(payload.get("pair_address") or payload.get("token_address") or "")
+        trace.step(f"Resolving DEX telemetry for {addr or '<unspecified>'}")
+        if addr:
+            try:
+                result = await _fetch_dex(addr)
+                trace.step(
+                    f"Dexscreener · 24h volume ${result['volume_24h_usdc']:,.0f} · "
+                    f"liquidity ${result['liquidity_depth_usdc']:,.0f}"
+                )
+                return result
+            except Exception as e:
+                trace.step(f"Dexscreener unavailable ({e}); falling back to stub")
         result = _telemetry(addr)
         trace.step(
-            f"24h volume ${result['volume_24h_usdc']:,.0f} · "
+            f"Stub · 24h volume ${result['volume_24h_usdc']:,.0f} · "
             f"liquidity ${result['liquidity_depth_usdc']:,.0f}"
         )
         return result
