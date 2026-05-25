@@ -22,7 +22,7 @@ The service auto-detects its mode from env:
 
 ## Persistence
 
-- With `MONGODB_URI` set: transactions persist to Mongo (collection `transactions`, indexed on `id` + `timestamp`).
+- With `MONGODB_URI` set: lifecycle rows persist to Mongo (collection `transactions`, unique on query ID + status). Distinct on-chain trader-wallet counts are restored from these rows on restart.
 - Without it: in-memory only, capped at 200 entries.
 
 ## Endpoints
