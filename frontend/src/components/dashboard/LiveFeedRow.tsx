@@ -30,6 +30,12 @@ function specialistName(specialistId: string): string {
 export function LiveFeedRow({ tx, nowMs }: Props) {
   const [copied, setCopied] = useState(false);
 
+  // A trace only exists once attested; ESCROWED rows carry a zero CID.
+  const hasTrace = Boolean(tx.traceCid) && !/^0x0*$/.test(tx.traceCid);
+  const traceHref = hasTrace
+    ? `/dashboard/trace?cid=${encodeURIComponent(tx.traceCid)}`
+    : "/dashboard/trace";
+
   const copyId = async () => {
     try {
       await navigator.clipboard.writeText(tx.id);
@@ -103,9 +109,12 @@ export function LiveFeedRow({ tx, nowMs }: Props) {
           <ArrowUpRight01Icon size={11} strokeWidth={1.5} />
         </a>
         <a
-          href="/dashboard/trace"
-          aria-label="Open trace explorer"
-          className="cursor-pointer rounded-sm border border-white/5 bg-white/[0.02] p-1 text-muted transition-colors hover:border-white/15 hover:bg-white/[0.06] hover:text-foreground"
+          href={traceHref}
+          aria-label={hasTrace ? "Inspect reasoning trace" : "Open trace explorer"}
+          title={hasTrace ? "Inspect reasoning trace" : "Open trace explorer"}
+          className={`cursor-pointer rounded-sm border border-white/5 bg-white/[0.02] p-1 transition-colors hover:border-white/15 hover:bg-white/[0.06] hover:text-foreground ${
+            hasTrace ? "text-foreground/70" : "text-muted/40"
+          }`}
         >
           <GlobalSearchIcon size={11} strokeWidth={1.5} />
         </a>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Search01Icon,
   CheckmarkCircle02Icon,
@@ -24,9 +24,14 @@ for (const s of ATLAS_FLAGSHIP_TRACE.steps) KNOWN[s.ipfsCid] = s;
 
 const SAMPLE_CID = ATLAS_FLAGSHIP_TRACE.steps[0].ipfsCid;
 
-export function TraceExplorer() {
-  const [value, setValue] = useState("");
+export function TraceExplorer({ initialCid }: { initialCid?: string }) {
+  const [value, setValue] = useState(initialCid ?? "");
   const [state, setState] = useState<State>({ kind: "idle" });
+
+  // Auto-resolve a CID passed in the URL (e.g. clicked from the live feed).
+  useEffect(() => {
+    if (initialCid) resolve(initialCid);
+  }, [initialCid]);
 
   async function resolve(raw: string) {
     const cid = raw.replace(/^ipfs:\/\//, "").trim();
@@ -123,9 +128,8 @@ export function TraceExplorer() {
                 Couldn&apos;t resolve that CID
               </p>
               <p className="font-mono text-[11px] text-muted">
-                {state.cid.slice(0, 24)}… isn&apos;t a known seed trace and
-                couldn&apos;t be fetched from the IPFS gateway (a `dev:` stub
-                CID won&apos;t resolve — set PINATA_JWT to pin real traces).
+                {state.cid.slice(0, 24)}… couldn&apos;t be fetched from the IPFS
+                gateway — it may not be a pinned reasoning-trace CID.
               </p>
             </div>
           </div>
