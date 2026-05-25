@@ -5,6 +5,7 @@ import { InfrastructureSection } from "@/components/landing/InfrastructureSectio
 import { AtlasSection } from "@/components/landing/AtlasSection";
 import { SpecialistDirectory } from "@/components/landing/SpecialistDirectory";
 import { CTASection } from "@/components/landing/CTASection";
+import { LiveStatsStrip } from "@/components/landing/LiveStatsStrip";
 
 export default function Home() {
   return (
@@ -16,6 +17,7 @@ export default function Home() {
         <AtlasSection />
         <SpecialistDirectory />
         <CTASection />
+        <LiveStatsStrip />
       </main>
       <Footer />
     </>

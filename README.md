@@ -147,6 +147,23 @@ Chain id `5042002` — every address is verifiable on **[testnet.arcscan.app](ht
 | `whale_tracker_eth` | whale tracking | $0.000300 | Etherscan |
 | `onchain_dex_data` | DEX telemetry | $0.000250 | Dexscreener |
 
+### Live traction — verifiable, not asserted
+
+Every counter below is read straight off the Marketplace contract — none of it is seeded. Atlas runs a live composition loop, so the numbers climb continuously:
+
+```
+300+ agent-to-agent queries settled on-chain   ·   300+ reasoning traces anchored on Arc
+real USDC paid per query, at ~$0.00009 each     ·   8 specialists live, onboarding permissionless
+```
+
+That's the thesis demonstrated, not described: real cognition trading hands at **fractions of a cent**, every exchange signed and anchored. Check the current figures yourself —
+
+```bash
+curl https://logos-api.discretliaison.com/api/summary
+```
+
+— or open the [Marketplace contract](https://testnet.arcscan.app/address/0x864dC1C51547353A594a9cA9B58B6f42B3f31fE5) on the explorer and count the events. The [live dashboard](https://logos-arc.vercel.app/dashboard) renders the same numbers in real time.
+
 ---
 
 ## Architecture
