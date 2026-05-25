@@ -1,14 +1,12 @@
 import { defineChain } from "viem";
 
 /**
- * Arc testnet (Canteen-hosted) chain definition.
- *
- * Per PRD §7.2, Arc mainnet is not yet live (targeted summer 2026); the
- * hackathon runs against Canteen's hosted Arc testnet. Fill the RPC URL +
- * chain ID + explorer below when you have them from the hackathon brief.
+ * Arc testnet chain definition. Env vars override the defaults below; the
+ * defaults are Arc's own public testnet so a missing env doesn't silently
+ * point wallets at the wrong network.
  */
 export const arcTestnet = defineChain({
-  id: Number(process.env.NEXT_PUBLIC_ARC_CHAIN_ID ?? 421614),
+  id: Number(process.env.NEXT_PUBLIC_ARC_CHAIN_ID ?? 5042002),
   name: "Arc Testnet",
   nativeCurrency: {
     name: "USDC",
@@ -18,15 +16,14 @@ export const arcTestnet = defineChain({
   rpcUrls: {
     default: {
       http: [
-        process.env.NEXT_PUBLIC_ARC_RPC_URL ??
-          "https://sepolia-rollup.arbitrum.io/rpc",
+        process.env.NEXT_PUBLIC_ARC_RPC_URL ?? "https://rpc.testnet.arc.network",
       ],
     },
   },
   blockExplorers: {
     default: {
       name: "Arc Explorer",
-      url: process.env.NEXT_PUBLIC_ARC_EXPLORER ?? "https://sepolia.arbiscan.io",
+      url: process.env.NEXT_PUBLIC_ARC_EXPLORER ?? "https://testnet.arcscan.app",
     },
   },
   testnet: true,

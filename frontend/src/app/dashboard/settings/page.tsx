@@ -62,7 +62,8 @@ export default function SettingsPage() {
       <Card title="Wallet">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <span className="text-[13px] text-muted">
-            Connect a wallet to interact with the marketplace.
+            Connect a wallet to view your address and session. Paid queries
+            settle through the SDK (<span className="font-mono">logos-arc</span>).
           </span>
           <ConnectWallet />
         </div>
