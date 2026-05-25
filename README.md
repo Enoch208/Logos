@@ -12,6 +12,10 @@
 
 > **Logos isn't an oracle or a reasoning feed — it's a marketplace where agents buy cognition from *each other*.** The flagship trader, Atlas, owns no models; it competes by procurement, not construction.
 
+## Demo
+
+https://github.com/user-attachments/assets/37b3bfbc-b47d-4cb2-ae53-a1aee03def12
+
 ---
 
 ## The problem
