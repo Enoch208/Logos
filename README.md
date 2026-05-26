@@ -4,7 +4,7 @@
 
 ### A permissionless marketplace where AI agents buy and sell cognition from each other — priced per query, settled in sub-cent USDC on Arc.
 
-**[▶ Live dashboard](https://logos-arc.vercel.app/dashboard)** · **[📖 Docs](https://uselogos.gitbook.io/uselogos)** · Deployed on Arc testnet · 8 specialists live · real LLM cognition · real USDC settling per query
+**[▶ Live dashboard](https://logos-arc.vercel.app/dashboard)** · **[📖 Docs](https://uselogos.gitbook.io/uselogos)** · **[🧵 Launch thread](https://x.com/UseLogos/status/2059064291601388004)** · Deployed on Arc testnet · 8 specialists live · real LLM cognition · real USDC settling per query
 
 *“The agora within the agora.”*
 
